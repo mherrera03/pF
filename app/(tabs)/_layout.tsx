@@ -54,17 +54,6 @@ export default function TabLayout() {
 
       {/* PERDIDAS / EXPLORE */}
       <Tabs.Screen
-        name="explore"
-        options={{
-          title: 'Perdidas',
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={22} name="magnifyingglass" color={color} />
-          ),
-        }}
-      />
-
-      {/* ADOPCION */}
-      <Tabs.Screen
         name="adoption"
         options={{
           title: 'Adopción',
@@ -74,11 +63,22 @@ export default function TabLayout() {
         }}
       />
 
-      {/* CITAS */}
+      {/* ADOPCION */}
       <Tabs.Screen
         name="citas"
         options={{
           title: 'Citas',
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={22} name="calendar" color={color} />
+          ),
+        }}
+      />
+
+      {/* CITAS */}
+      <Tabs.Screen
+        name="explore"
+        options={{
+          title: 'Perfil',
           tabBarIcon: ({ color }) => (
             <IconSymbol size={22} name="calendar" color={color} />
           ),
