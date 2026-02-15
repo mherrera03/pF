@@ -1,5 +1,8 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+// Si NO usarás Firebase Storage, puedes borrar estas 2 líneas:
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDxoFfTy8mq7N51LFwNLzzY4M5SDb5Uwrk",
@@ -13,4 +16,9 @@ const firebaseConfig = {
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
+export const db = getFirestore(app);
+
+// opcional
+export const storage = getStorage(app);
+
 export default app;

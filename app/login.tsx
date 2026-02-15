@@ -63,7 +63,7 @@ export default function Login() {
         </View>
 
         <View style={styles.button}>
-          <Button title="Volver a Registro" onPress={() => router.push("/registro")} color="#A0E7E5" />
+          <Button title="Registrarse" onPress={() => router.push("/registro")} color="#A0E7E5" />
         </View>
       </View>
     </View>
