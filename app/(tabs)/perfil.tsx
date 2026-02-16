@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { onAuthStateChanged, signOut, updateProfile } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
-import { Alert, Button, Image, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Alert, Button, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { auth, db } from "../../config/firebase";
 import { uploadToImageKit } from "../../services/imageUpload";
 
@@ -29,7 +29,6 @@ export default function Perfil() {
       setLoadingUser(false);
 
       if (u) {
-        // 1️⃣ Crear documento si no existe
         await setDoc(
           doc(db, "users", u.uid),
           {
@@ -104,7 +103,7 @@ export default function Perfil() {
 
     try {
       await updateProfile(user, { displayName: newName });
-      setUserName(newName);      // actualiza lo que se muestra
+      setUserName(newName);      
       setEditing(false);
       Alert.alert("Listo", "Nombre actualizado.");
     } catch {
@@ -186,25 +185,12 @@ export default function Perfil() {
         )}
       </View>
 
-      <Section title="Mascotas registradas">
-        <Text>- Listado de mascotas</Text>
-        <Text>- Ficha de mascota</Text>
-        <Text>- Botón agregar mascota</Text>
-      </Section>
+      <Section title="Mascotas registradas" />
 
-      <Section title="Mi actividad">
-        <Text>- Reportes de pérdida</Text>
-        <Text>- Solicitud de adopción</Text>
-        <Text>- Perfil de adoptante</Text>
-      </Section>
+      <Section title="Mi actividad" />
 
-      <Section title="Configuración y soporte">
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-          <Text>Notificaciones</Text>
-          <Switch value={notificationsOn} onValueChange={setNotificationsOn} />
-        </View>
-        <Text>Ayuda y soporte (FAQ)</Text>
-      </Section>
+      <Section title="Configuración y soporte" />
+
 
       <View style={{ marginTop: "auto" }}>
         <Button title="Cerrar sesión" onPress={onLogout} />
@@ -213,11 +199,26 @@ export default function Perfil() {
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children?: React.ReactNode;
+}) {
   return (
-    <View style={{ padding: 12, borderWidth: 1, borderRadius: 12, borderColor: "#eee", gap: 6 }}>
+    <View
+      style={{
+        padding: 12,
+        borderWidth: 1,
+        borderRadius: 12,
+        borderColor: "#eee",
+        gap: 6,
+      }}
+    >
       <Text style={{ fontSize: 16, fontWeight: "700" }}>{title}</Text>
       {children}
     </View>
   );
 }
+
