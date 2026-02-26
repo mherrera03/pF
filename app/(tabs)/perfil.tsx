@@ -3,11 +3,17 @@ import { router } from "expo-router";
 import { onAuthStateChanged, signOut, updateProfile } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
-import { Alert, Button, Image, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
+import {
+  Alert,
+  Image,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { auth, db } from "../../config/firebase";
 import { uploadToImageKit } from "../../services/imageUpload";
-
-const PHOTO_KEY = "pf_profile_photo_uri";
 
 export default function Perfil() {
   const [loadingUser, setLoadingUser] = useState(true);
@@ -15,12 +21,10 @@ export default function Perfil() {
   const [userName, setUserName] = useState("");
   const [email, setEmail] = useState("");
 
-  const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [photoUri, setPhotoUri] = useState(null);
 
   const [editing, setEditing] = useState(false);
   const [nameInput, setNameInput] = useState("");
-
-  const [notificationsOn, setNotificationsOn] = useState(true);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
@@ -88,9 +92,8 @@ export default function Perfil() {
       setPhotoUri(imageUrl);
 
       Alert.alert("Listo", "Foto actualizada");
-    } catch (error: any) {
-      console.log("ERROR SUBIENDO FOTO:", error?.message ?? error);
-      Alert.alert("Error", error?.message ?? "No se pudo subir la imagen");
+    } catch (error) {
+      Alert.alert("Error", "No se pudo subir la imagen");
     }
   };
 
@@ -99,11 +102,11 @@ export default function Perfil() {
     const newName = nameInput.trim();
 
     if (!user) return Alert.alert("Error", "No hay usuario autenticado.");
-    if (!newName) return Alert.alert("Error", "Escribe tu nombre de usuario.");
+    if (!newName) return Alert.alert("Error", "Escribe tu nombre.");
 
     try {
       await updateProfile(user, { displayName: newName });
-      setUserName(newName);      
+      setUserName(newName);
       setEditing(false);
       Alert.alert("Listo", "Nombre actualizado.");
     } catch {
@@ -130,95 +133,164 @@ export default function Perfil() {
 
   return (
     <ScrollView
+      style={{ flex: 1, backgroundColor: "#F5F6FA" }}
       contentContainerStyle={{
-        flexGrow: 1,
-        padding: 16,
-        gap: 14,
-        paddingBottom: 110,
+        padding: 20,
+        paddingBottom: 120,
       }}
+      showsVerticalScrollIndicator={false}
     >
-      <Text style={{ fontSize: 22, fontWeight: "800" }}>Perfil / Ajustes</Text>
+      {/* TITULO */}
+      <Text
+        style={{
+          fontSize: 26,
+          fontWeight: "900",
+          textAlign: "center",
+          marginBottom: 18,
+          marginTop:10,
+        }}
+      >
+        Mi perfil
+      </Text>
 
-      {/* Foto + nombre */}
-      <View style={{ padding: 12, borderWidth: 1, borderRadius: 12, borderColor: "#ddd", gap: 10 }}>
-        <TouchableOpacity onPress={pickPhoto} style={{ alignSelf: "flex-start" }}>
+      {/* CARD PRINCIPAL */}
+      <View
+        style={{
+          padding: 22,
+          borderRadius: 20,
+          backgroundColor: "#FFFFFF",
+          alignItems: "center",
+          shadowColor: "#000",
+          shadowOpacity: 0.05,
+          shadowRadius: 10,
+          elevation: 4,
+          gap: 12,
+        }}
+      >
+        {/* FOTO */}
+        <TouchableOpacity onPress={pickPhoto}>
           <View
             style={{
-              width: 92,
-              height: 92,
-              borderRadius: 46,
-              backgroundColor: "#eee",
+              width: 110,
+              height: 110,
+              borderRadius: 55,
+              backgroundColor: "#F2F4F7",
               overflow: "hidden",
               justifyContent: "center",
               alignItems: "center",
             }}
           >
             {photoUri ? (
-              <Image source={{ uri: photoUri }} style={{ width: "100%", height: "100%" }}/>
+              <Image
+                source={{ uri: photoUri }}
+                style={{ width: "100%", height: "100%" }}
+              />
             ) : (
               <Text>Foto</Text>
             )}
           </View>
         </TouchableOpacity>
 
-        <Text>Correo: {email || "-"}</Text>
-
+        {/* INFO */}
         {editing ? (
           <>
             <TextInput
               value={nameInput}
               onChangeText={setNameInput}
-              placeholder="Nombre de usuario"
-              autoCapitalize="none"
-              style={{ borderWidth: 1, borderColor: "#ddd", borderRadius: 10, padding: 10 }}
+              placeholder="Nombre"
+              style={{
+                width: "100%",
+                borderWidth: 1,
+                borderColor: "#E5E7EB",
+                borderRadius: 12,
+                padding: 12,
+              }}
             />
-            <Button title="Guardar cambios" onPress={onSaveProfile} />
-            <Button title="Cancelar" onPress={() => { setNameInput(userName); setEditing(false); }} />
+
+            <TouchableOpacity
+              onPress={onSaveProfile}
+              style={{
+                backgroundColor: "#4DB6AC",
+                paddingVertical: 12,
+                paddingHorizontal: 25,
+                borderRadius: 12,
+                marginTop: 6,
+              }}
+            >
+              <Text style={{ color: "#fff", fontWeight: "700" }}>
+                Guardar cambios
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => setEditing(false)}>
+              <Text style={{ color: "#777", marginTop: 6 }}>Cancelar</Text>
+            </TouchableOpacity>
           </>
         ) : (
           <>
-            <Text>
-              Nombre de usuario: <Text style={{ fontWeight: "700" }}>{userName || "Usuario"}</Text>
+            <Text style={{ fontSize: 21, fontWeight: "800" }}>
+              {userName || "Usuario"}
             </Text>
-            <Button title="Editar perfil" onPress={startEdit} />
+
+            <Text style={{ color: "#777" }}>{email}</Text>
+
+            <TouchableOpacity
+              onPress={startEdit}
+              style={{
+                backgroundColor: "#4DB6AC",
+                paddingVertical: 10,
+                paddingHorizontal: 18,
+                borderRadius: 12,
+                marginTop: 8,
+              }}
+            >
+              <Text style={{ color: "#fff", fontWeight: "700" }}>
+                Editar perfil
+              </Text>
+            </TouchableOpacity>
           </>
         )}
       </View>
 
+      {/* SECCIONES */}
       <Section title="Mascotas registradas" />
-
       <Section title="Mi actividad" />
-
       <Section title="Configuración y soporte" />
 
-
-      <View style={{ marginTop: "auto" }}>
-        <Button title="Cerrar sesión" onPress={onLogout} />
-      </View>
+      {/* LOGOUT */}
+      <TouchableOpacity
+        onPress={onLogout}
+        style={{
+          backgroundColor: "#cd1f5c",
+          padding: 14,
+          borderRadius: 14,
+          alignItems: "center",
+          marginTop: 20,
+        }}
+      >
+        <Text style={{ color: "#fff", fontWeight: "800" }}>
+          Cerrar sesión
+        </Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
 
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children?: React.ReactNode;
-}) {
+function Section({ title }) {
   return (
     <View
       style={{
-        padding: 12,
-        borderWidth: 1,
-        borderRadius: 12,
-        borderColor: "#eee",
-        gap: 6,
+        padding: 18,
+        borderRadius: 18,
+        backgroundColor: "#fff",
+        marginTop: 16,
+        shadowColor: "#000",
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        elevation: 2,
       }}
     >
       <Text style={{ fontSize: 16, fontWeight: "700" }}>{title}</Text>
-      {children}
     </View>
   );
 }
-

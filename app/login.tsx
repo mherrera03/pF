@@ -36,9 +36,9 @@ export default function Login() {
           autoCapitalize="none"
           keyboardType="email-address"
           placeholderTextColor="#999"
+          returnKeyType="next" 
         />
 
-        {}
         <View style={styles.passwordContainer}>
           <TextInput
             style={styles.passwordInput}
@@ -47,6 +47,8 @@ export default function Login() {
             onChangeText={setPassword}
             secureTextEntry={!showPassword}
             placeholderTextColor="#999"
+            returnKeyType="done" // Cambia el botón del teclado a "Hecho/Realizado"
+            onSubmitEditing={onLogin} // <--- ESTO ejecuta el login al darle al teclado
           />
 
           <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
@@ -59,11 +61,11 @@ export default function Login() {
         </View>
 
         <View style={styles.button}>
-          <Button title="Entrar" onPress={onLogin} color="#F8A5C2" />
+          <Button title="Entrar" onPress={onLogin} color="#863ac9" />
         </View>
 
         <View style={styles.button}>
-          <Button title="Registrarse" onPress={() => router.push("/registro")} color="#A0E7E5" />
+          <Button title="Registrarse" onPress={() => router.push("/registro")} color="#5bb7b4" />
         </View>
       </View>
     </View>
@@ -101,8 +103,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     fontSize: 16,
   },
-
- 
   passwordContainer: {
     backgroundColor: "#F1F2F6",
     borderRadius: 12,
@@ -111,13 +111,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-
   passwordInput: {
     flex: 1,
     paddingVertical: 14,
     fontSize: 16,
   },
-
   button: {
     borderRadius: 12,
     overflow: "hidden",
