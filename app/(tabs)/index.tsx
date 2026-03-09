@@ -14,8 +14,9 @@ import {
   View,
 } from "react-native";
 
+import { onAuthStateChanged } from "firebase/auth";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
-import { db } from "../../config/firebase";
+import { auth, db } from "../../config/firebase";
 
 type ReporteMascota = {
   fotoUrl?: string | null;
@@ -33,44 +34,59 @@ function HomeScreen() {
   const router = useRouter();
 
   const [showMenu, setShowMenu] = useState(false);
-
   const [allMascotas, setAllMascotas] = useState<ReporteMascota[]>([]);
   const [mascotas, setMascotas] = useState<ReporteMascota[]>([]);
   const [filtrosActivos, setFiltrosActivos] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, "reportes"), orderBy("createdAt", "desc"));
+    let unsubReportes: (() => void) | null = null;
 
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const lista: ReporteMascota[] = snap.docs.map((doc) => {
-          const data = doc.data() as any;
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      console.log("Usuario actual:", user?.uid ?? null);
 
-          return {
-            id: doc.id,
-            nombre: data.nombre ?? "",
-            tipo: data.tipo ?? "",
-            tamaño: data.tamaño ?? "",
-            raza: data.raza ?? "",
-            fecha: data.fecha ?? "",
-            rasgos: data.rasgos ?? "",
-            ubicacion: data.ubicacion ?? "",
-            fotoUrl: data.fotoUrl ?? null,
-          };
-        });
-
-        setAllMascotas(lista);
+      if (!user) {
+        console.log("No hay usuario autenticado");
+        setAllMascotas([]);
         setLoading(false);
-      },
-      (err) => {
-        console.log("Error leyendo reportes:", err);
-        setLoading(false);
+        return;
       }
-    );
 
-    return () => unsub();
+      const q = query(collection(db, "reportes"), orderBy("createdAt", "desc"));
+
+      unsubReportes = onSnapshot(
+        q,
+        (snap) => {
+          const lista: ReporteMascota[] = snap.docs.map((doc) => {
+            const data = doc.data() as any;
+
+            return {
+              id: doc.id,
+              nombre: data.nombre ?? "",
+              tipo: data.tipo ?? "",
+              tamaño: data.tamaño ?? "",
+              raza: data.raza ?? "",
+              fecha: data.fecha ?? "",
+              rasgos: data.rasgos ?? "",
+              ubicacion: data.ubicacion ?? "",
+              fotoUrl: data.fotoUrl ?? null,
+            };
+          });
+
+          setAllMascotas(lista);
+          setLoading(false);
+        },
+        (err) => {
+          console.log("Error leyendo reportes:", err);
+          setLoading(false);
+        }
+      );
+    });
+
+    return () => {
+      unsubAuth();
+      if (unsubReportes) unsubReportes();
+    };
   }, []);
 
   const aplicarFiltro = (tipo: string, valor: string) => {

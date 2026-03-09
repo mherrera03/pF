@@ -1,7 +1,6 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-// Si NO usarás Firebase Storage, puedes borrar estas 2 líneas:
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
