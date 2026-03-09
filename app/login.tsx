@@ -61,7 +61,7 @@ export default function Login() {
         </View>
 
         <View style={styles.button}>
-          <Button title="Entrar" onPress={onLogin} color="#863ac9" />
+          <Button title="Entrar" onPress={() => router.push("/")} color="#863ac9" />
         </View>
 
         <View style={styles.button}>

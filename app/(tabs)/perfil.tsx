@@ -20,8 +20,7 @@ export default function Perfil() {
 
   const [userName, setUserName] = useState("");
   const [email, setEmail] = useState("");
-
-  const [photoUri, setPhotoUri] = useState(null);
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
 
   const [editing, setEditing] = useState(false);
   const [nameInput, setNameInput] = useState("");
@@ -46,6 +45,7 @@ export default function Perfil() {
 
         const snap = await getDoc(doc(db, "users", u.uid));
         const data = snap.data();
+
         if (data?.photoUrl) {
           setPhotoUri(data.photoUrl);
         }
@@ -90,7 +90,6 @@ export default function Perfil() {
       });
 
       setPhotoUri(imageUrl);
-
       Alert.alert("Listo", "Foto actualizada");
     } catch (error) {
       Alert.alert("Error", "No se pudo subir la imagen");
@@ -106,6 +105,11 @@ export default function Perfil() {
 
     try {
       await updateProfile(user, { displayName: newName });
+
+      await updateDoc(doc(db, "users", user.uid), {
+        displayName: newName,
+      });
+
       setUserName(newName);
       setEditing(false);
       Alert.alert("Listo", "Nombre actualizado.");
@@ -140,20 +144,18 @@ export default function Perfil() {
       }}
       showsVerticalScrollIndicator={false}
     >
-      {/* TITULO */}
       <Text
         style={{
           fontSize: 26,
           fontWeight: "900",
           textAlign: "center",
           marginBottom: 18,
-          marginTop:10,
+          marginTop: 10,
         }}
       >
         Mi perfil
       </Text>
 
-      {/* CARD PRINCIPAL */}
       <View
         style={{
           padding: 22,
@@ -167,7 +169,6 @@ export default function Perfil() {
           gap: 12,
         }}
       >
-        {/* FOTO */}
         <TouchableOpacity onPress={pickPhoto}>
           <View
             style={{
@@ -191,7 +192,6 @@ export default function Perfil() {
           </View>
         </TouchableOpacity>
 
-        {/* INFO */}
         {editing ? (
           <>
             <TextInput
@@ -252,12 +252,24 @@ export default function Perfil() {
         )}
       </View>
 
-      {/* SECCIONES */}
-      <Section title="Mascotas registradas" />
-      <Section title="Mi actividad" />
-      <Section title="Configuración y soporte" />
+      <Section
+        title="Mascotas registradas"
+        subtitle="Ver tus mascotas agregadas"
+        onPress={() => router.push("/mascotasRegistradas")}
+      />
 
-      {/* LOGOUT */}
+      <Section
+        title="Mi actividad"
+        subtitle="Revisa tus reportes y publicaciones"
+        onPress={() => router.push("/miActividad")}
+      />
+
+      <Section
+        title="Configuración y soporte"
+        subtitle="Opciones de cuenta y ayuda"
+        onPress={() => router.push("/configuracionSoporte")}
+      />
+
       <TouchableOpacity
         onPress={onLogout}
         style={{
@@ -276,9 +288,16 @@ export default function Perfil() {
   );
 }
 
-function Section({ title }) {
+type SectionProps = {
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+};
+
+function Section({ title, subtitle, onPress }: SectionProps) {
   return (
-    <View
+    <TouchableOpacity
+      onPress={onPress}
       style={{
         padding: 18,
         borderRadius: 18,
@@ -290,7 +309,10 @@ function Section({ title }) {
         elevation: 2,
       }}
     >
-      <Text style={{ fontSize: 16, fontWeight: "700" }}>{title}</Text>
-    </View>
+      <Text style={{ fontSize: 16, fontWeight: "700", marginBottom: 4 }}>
+        {title}
+      </Text>
+      <Text style={{ color: "#777" }}>{subtitle}</Text>
+    </TouchableOpacity>
   );
 }

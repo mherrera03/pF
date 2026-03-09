@@ -22,10 +22,10 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 
 // ✅ Firestore
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { auth, db } from "../config/firebase"; // ajusta si tu ruta es otra
+import { auth, db } from "../config/firebase";
 
-// ✅ ImageKit uploader (ajusta ruta)
-import { uploadToImageKit } from "../services/imageUpload"; // ajusta
+// ✅ ImageKit uploader
+import { uploadToImageKit } from "../services/imageUpload";
 
 const formatDateDDMMYYYY = (d: Date) => {
   const dd = String(d.getDate()).padStart(2, "0");
@@ -55,17 +55,20 @@ export default function ReporteScreen() {
     nombre: "",
     especie: "",
     raza: "",
+    razaOtro: "",
     color: "",
     telefono: "",
     tamaño: "",
     rasgos: "",
+    ofreceRecompensa: "",
+    montoRecompensa: "",
   });
 
   const [fechaDate, setFechaDate] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   const handleChange = (campo: string, valor: string) => {
-    setFormData({ ...formData, [campo]: valor });
+    setFormData((prev) => ({ ...prev, [campo]: valor }));
   };
 
   const pickImage = async () => {
@@ -77,7 +80,7 @@ export default function ReporteScreen() {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images, 
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 1,
     });
 
@@ -99,9 +102,14 @@ export default function ReporteScreen() {
   const validar = () => {
     if (!formData.nombre.trim()) return "Escribe el nombre de la mascota.";
     if (!formData.especie) return "Selecciona la especie (Perro/Gato).";
-    if (!formData.raza.trim()) return "Escribe la raza.";
+    if (!formData.raza) return "Selecciona la raza.";
+    if (formData.raza === "Otro" && !formData.razaOtro.trim()) return "Escribe la raza de la mascota.";
     if (!formData.telefono.trim()) return "Escribe un teléfono.";
     if (!coords) return "Obtén la ubicación actual.";
+
+    if (formData.ofreceRecompensa === "si" && !formData.montoRecompensa.trim()) {
+      return "Escribe el monto de la recompensa.";
+    }
 
     if (tipoReporte === "completo") {
       if (!formData.tamaño) return "Selecciona el tamaño.";
@@ -124,23 +132,27 @@ export default function ReporteScreen() {
       const user = auth.currentUser;
       const uid = user?.uid ?? null;
 
-      // ✅ 1) Subir foto a ImageKit (si existe)
       let fotoUrl: string | null = null;
       if (image) {
         const res = await uploadToImageKit(image);
         fotoUrl = typeof res === "string" ? res : (res?.url ?? null);
       }
 
+      const razaFinal = formData.raza === "Otro" ? formData.razaOtro.trim() : formData.raza.trim();
+
       await addDoc(collection(db, "reportes"), {
         nombre: formData.nombre.trim(),
-        tipo: formData.especie, 
-        raza: formData.raza.trim(), 
-        fecha: formatDateDDMMYYYY(fechaDate), 
+        tipo: formData.especie,
+        raza: razaFinal,
+        fecha: formatDateDDMMYYYY(fechaDate),
         color: formData.color || null,
         telefono: formData.telefono.trim(),
 
         tamaño: tipoReporte === "completo" ? formData.tamaño : null,
         rasgos: tipoReporte === "completo" ? formData.rasgos.trim() : null,
+
+        recompensa: formData.ofreceRecompensa === "si",
+        montoRecompensa: formData.ofreceRecompensa === "si" ? formData.montoRecompensa.trim() : null,
 
         coords: coords ? { latitude: coords.latitude, longitude: coords.longitude } : null,
         ubicacion: coords ? `${coords.latitude}, ${coords.longitude}` : null,
@@ -167,12 +179,44 @@ export default function ReporteScreen() {
     if (selectedDate) setFechaDate(selectedDate);
   };
 
+  const razasPerro = [
+    "Labrador",
+    "Golden Retriever",
+    "Pastor Alemán",
+    "Chihuahua",
+    "Poodle",
+    "Bulldog",
+    "Husky",
+    "Shih Tzu",
+    "Beagle",
+    "Rottweiler",
+    "Otro",
+  ];
+
+  const razasGato = [
+    "Persa",
+    "Siamés",
+    "Maine Coon",
+    "Angora",
+    "Bengalí",
+    "Azul Ruso",
+    "British Shorthair",
+    "Sphynx",
+    "Otro",
+  ];
+
+  const razasSegunEspecie =
+    formData.especie === "Perro"
+      ? razasPerro
+      : formData.especie === "Gato"
+      ? razasGato
+      : [];
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 150 }} showsVerticalScrollIndicator={false}>
       <StatusBar barStyle="light-content" />
       <Text style={styles.title}>Nuevo Reporte</Text>
 
-      {/* Toggle */}
       <View style={styles.toggleContainer}>
         {["rapido", "completo"].map((tipo) => (
           <TouchableOpacity
@@ -188,7 +232,6 @@ export default function ReporteScreen() {
         ))}
       </View>
 
-      {/* Nombre */}
       <TextInput
         style={styles.input}
         placeholder="Nombre de la mascota"
@@ -197,7 +240,6 @@ export default function ReporteScreen() {
         editable={!submitting}
       />
 
-      {/* Especie */}
       <Text style={styles.label}>Especie</Text>
       <View style={styles.wrapRow}>
         {["Perro", "Gato"].map((esp) => (
@@ -206,27 +248,57 @@ export default function ReporteScreen() {
               style={[styles.chip, formData.especie === esp && styles.chipActive]}
               onPress={() => {
                 handleChange("especie", esp);
+                handleChange("raza", "");
+                handleChange("razaOtro", "");
                 animatePress();
               }}
               disabled={submitting}
             >
-              <Text style={[styles.chipText, formData.especie === esp && styles.chipTextActive]}>{esp}</Text>
+              <Text style={[styles.chipText, formData.especie === esp && styles.chipTextActive]}>
+                {esp}
+              </Text>
             </TouchableOpacity>
           </Animated.View>
         ))}
       </View>
 
-      {/* ✅ Raza (para ambos) */}
       <Text style={styles.label}>Raza</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="ej: Golden Retriever"
-        value={formData.raza}
-        onChangeText={(text) => handleChange("raza", text)}
-        editable={!submitting}
-      />
+      <View style={styles.pickerContainer}>
+        <Picker
+          selectedValue={formData.raza}
+          onValueChange={(v) => {
+            handleChange("raza", v);
+            if (v !== "Otro") {
+              handleChange("razaOtro", "");
+            }
+          }}
+          enabled={!submitting && !!formData.especie}
+        >
+          <Picker.Item
+            label={
+              formData.especie
+                ? "Seleccionar raza..."
+                : "Primero selecciona la especie"
+            }
+            value=""
+          />
 
-      {/* ✅ Fecha (para ambos) */}
+          {razasSegunEspecie.map((raza) => (
+            <Picker.Item key={raza} label={raza} value={raza} />
+          ))}
+        </Picker>
+      </View>
+
+      {formData.raza === "Otro" && (
+        <TextInput
+          style={styles.input}
+          placeholder="Escribe la raza de la mascota"
+          value={formData.razaOtro}
+          onChangeText={(text) => handleChange("razaOtro", text)}
+          editable={!submitting}
+        />
+      )}
+
       <Text style={styles.label}>Fecha</Text>
       <TouchableOpacity
         style={styles.dateButton}
@@ -246,7 +318,6 @@ export default function ReporteScreen() {
         />
       )}
 
-      {/* Color */}
       <Text style={styles.label}>Color</Text>
       <View style={styles.pickerContainer}>
         <Picker selectedValue={formData.color} onValueChange={(v) => handleChange("color", v)} enabled={!submitting}>
@@ -261,7 +332,6 @@ export default function ReporteScreen() {
         </Picker>
       </View>
 
-      {/* Ubicación */}
       <Text style={styles.label}>Ubicación</Text>
       <TouchableOpacity style={styles.locationButton} onPress={getLocation} disabled={submitting}>
         <Text style={styles.locationText}>Obtener ubicación actual</Text>
@@ -277,7 +347,6 @@ export default function ReporteScreen() {
         </TouchableOpacity>
       )}
 
-      {/* Teléfono */}
       <TextInput
         style={styles.input}
         placeholder="Teléfono"
@@ -287,14 +356,52 @@ export default function ReporteScreen() {
         editable={!submitting}
       />
 
-      {/* ✅ Foto para RÁPIDO y COMPLETO */}
+      <Text style={styles.label}>¿Ofreces recompensa?</Text>
+      <View style={styles.wrapRow}>
+        {[
+          { label: "Sí", value: "si" },
+          { label: "No", value: "no" },
+        ].map((item) => (
+          <Animated.View key={item.value} style={{ transform: [{ scale: scaleAnim }] }}>
+            <TouchableOpacity
+              style={[styles.chip, formData.ofreceRecompensa === item.value && styles.chipActive]}
+              onPress={() => {
+                handleChange("ofreceRecompensa", item.value);
+                if (item.value === "no") handleChange("montoRecompensa", "");
+                animatePress();
+              }}
+              disabled={submitting}
+            >
+              <Text
+                style={[
+                  styles.chipText,
+                  formData.ofreceRecompensa === item.value && styles.chipTextActive,
+                ]}
+              >
+                {item.label}
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
+        ))}
+      </View>
+
+      {formData.ofreceRecompensa === "si" && (
+        <TextInput
+          style={styles.input}
+          placeholder="Monto de la recompensa"
+          keyboardType="numeric"
+          value={formData.montoRecompensa}
+          onChangeText={(text) => handleChange("montoRecompensa", text)}
+          editable={!submitting}
+        />
+      )}
+
       <TouchableOpacity style={styles.photoButton} onPress={pickImage} disabled={submitting}>
         <Text style={styles.photoText}>{image ? "Cambiar Foto" : "Agregar Foto"}</Text>
       </TouchableOpacity>
 
       {image && <Image source={{ uri: image }} style={styles.previewImage} />}
 
-      {/* Completo extra */}
       {tipoReporte === "completo" && (
         <>
           <Text style={styles.label}>Tamaño</Text>

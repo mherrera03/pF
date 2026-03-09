@@ -24,7 +24,7 @@ type ReporteMascota = {
   tipo: "Perro" | "Gato" | string;
   tamaño: "Pequeño" | "Mediano" | "Grande" | string;
   raza: string;
-  fecha: string; // puedes guardar como string o Timestamp; aquí lo mostramos string
+  fecha: string;
   rasgos: string;
   ubicacion: string;
 };
@@ -34,13 +34,11 @@ function HomeScreen() {
 
   const [showMenu, setShowMenu] = useState(false);
 
-  // ✅ ahora se llena desde BD
   const [allMascotas, setAllMascotas] = useState<ReporteMascota[]>([]);
   const [mascotas, setMascotas] = useState<ReporteMascota[]>([]);
   const [filtrosActivos, setFiltrosActivos] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ 1) Cargar reportes desde Firestore en tiempo real
   useEffect(() => {
     const q = query(collection(db, "reportes"), orderBy("createdAt", "desc"));
 
@@ -56,7 +54,7 @@ function HomeScreen() {
             tipo: data.tipo ?? "",
             tamaño: data.tamaño ?? "",
             raza: data.raza ?? "",
-            fecha: data.fecha ?? "", 
+            fecha: data.fecha ?? "",
             rasgos: data.rasgos ?? "",
             ubicacion: data.ubicacion ?? "",
             fotoUrl: data.fotoUrl ?? null,
@@ -75,7 +73,6 @@ function HomeScreen() {
     return () => unsub();
   }, []);
 
-  // ✅ 2) Función para aplicar filtros SIEMPRE sobre allMascotas
   const aplicarFiltro = (tipo: string, valor: string) => {
     const filtro = `${tipo}:${valor}`;
 
@@ -90,7 +87,6 @@ function HomeScreen() {
     setShowMenu(false);
   };
 
-  // ✅ 3) Recalcular lista filtrada cuando cambie BD o filtros
   useEffect(() => {
     const especies = filtrosActivos
       .filter((f) => f.startsWith("especie"))
@@ -231,7 +227,15 @@ function HomeScreen() {
           </View>
         }
         renderItem={({ item }) => (
-          <View style={styles.card}>
+          <TouchableOpacity
+            style={styles.card}
+            onPress={() =>
+              router.push({
+                pathname: "/[id]" as any,
+                params: { id: item.id },
+              })
+            }
+          >
             <View style={styles.cardContent}>
               <View style={styles.imageBox}>
                 {item.fotoUrl ? (
@@ -242,7 +246,7 @@ function HomeScreen() {
                   </View>
                 )}
               </View>
-                
+
               <View style={styles.infoContainer}>
                 <Text style={styles.petName}>{item.nombre}</Text>
                 <Text style={styles.petDetails}>Raza: {item.raza}</Text>
@@ -257,7 +261,7 @@ function HomeScreen() {
             <TouchableOpacity style={styles.foundButton}>
               <Text style={styles.foundButtonText}>Reportar hallazgo</Text>
             </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
         )}
       />
     </SafeAreaView>
@@ -267,7 +271,7 @@ function HomeScreen() {
 export default HomeScreen;
 
 const styles = StyleSheet.create({
-    imageBox: {
+  imageBox: {
     width: 100,
     height: 100,
     borderRadius: 12,
