@@ -1,5 +1,6 @@
+import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
 import { getApp, getApps, initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getReactNativePersistence, initializeAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
@@ -14,9 +15,21 @@ const firebaseConfig = {
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
-export const auth = getAuth(app);
+export const auth = initializeAuth(app, {
+  persistence: getReactNativePersistence(ReactNativeAsyncStorage)
+});
+
 export const db = getFirestore(app);
-
 export const storage = getStorage(app);
-
 export default app;
+
+/*
+const firebaseConfig = {
+  apiKey: "AIzaSyDxoFfTy8mq7N51LFwNLzzY4M5SDb5Uwrk",
+  authDomain: "pafe-1d5ca.firebaseapp.com",
+  projectId: "pafe-1d5ca",
+  storageBucket: "pafe-1d5ca.firebasestorage.app",
+  messagingSenderId: "494291864728",
+  appId: "1:494291864728:web:66301596849ff675af94ed",
+};
+*/
