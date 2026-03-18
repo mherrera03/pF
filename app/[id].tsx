@@ -1,7 +1,15 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { addDoc, collection, doc, getDoc, serverTimestamp } from "firebase/firestore";
-import { useEffect, useState } from "react";
 import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  serverTimestamp,
+} from "firebase/firestore";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Dimensions,
+  FlatList,
   Image,
   Linking,
   ScrollView,
@@ -9,16 +17,20 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 import { db } from "../config/firebase";
 
 import MapView, { Marker } from "react-native-maps";
 
+const { width } = Dimensions.get("window");
+const CAROUSEL_WIDTH = width - 40;
+
 export default function DetalleReporte() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const [reporte, setReporte] = useState<any>(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   useEffect(() => {
     const cargar = async () => {
@@ -26,12 +38,33 @@ export default function DetalleReporte() {
       const snap = await getDoc(ref);
 
       if (snap.exists()) {
-        setReporte(snap.data());
+        const data = snap.data();
+
+        setReporte({
+          id: snap.id,
+          ...data,
+          fotosUrls: Array.isArray(data.fotosUrls)
+            ? data.fotosUrls.slice(0, 5)
+            : data.fotoUrl
+            ? [data.fotoUrl]
+            : [],
+        });
       }
     };
 
     cargar();
-  }, []);
+  }, [id]);
+
+  const fotos = useMemo(() => {
+    if (!reporte) return [];
+    if (Array.isArray(reporte.fotosUrls) && reporte.fotosUrls.length > 0) {
+      return reporte.fotosUrls.slice(0, 5);
+    }
+    if (reporte.fotoUrl) {
+      return [reporte.fotoUrl];
+    }
+    return [];
+  }, [reporte]);
 
   const abrirMaps = () => {
     if (!reporte?.coords) return;
@@ -64,29 +97,24 @@ export default function DetalleReporte() {
     }
   };
 
-  // 🔔 NUEVO: reportar hallazgo
   const reportarHallazgo = async () => {
     try {
-
-      // guardar reporte de hallazgo
       await addDoc(collection(db, "hallazgos"), {
         reporteId: id,
         nombreMascota: reporte?.nombre || null,
         telefonoContacto: reporte?.telefono || null,
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
       });
 
-      // crear notificación para el dueño
       await addDoc(collection(db, "notificaciones"), {
         tipo: "hallazgo",
         reporteId: id,
         mensaje: `Alguien reportó haber encontrado a ${reporte?.nombre || "tu mascota"}`,
         createdAt: serverTimestamp(),
-        leido: false
+        leido: false,
       });
 
       alert("Se notificó al dueño de la mascota 🐾");
-
     } catch (error) {
       console.log("Error reportando hallazgo:", error);
     }
@@ -110,8 +138,33 @@ export default function DetalleReporte() {
         <Text style={styles.backText}>← Volver</Text>
       </TouchableOpacity>
 
-      {reporte.fotoUrl ? (
-        <Image source={{ uri: reporte.fotoUrl }} style={styles.image} />
+      {fotos.length > 0 ? (
+        <View style={styles.carouselWrapper}>
+          <FlatList
+            data={fotos}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            keyExtractor={(item, index) => `${item}-${index}`}
+            onMomentumScrollEnd={(event) => {
+              const index = Math.round(
+                event.nativeEvent.contentOffset.x / CAROUSEL_WIDTH
+              );
+              setCurrentImageIndex(index);
+            }}
+            renderItem={({ item }) => (
+              <Image source={{ uri: item }} style={styles.image} />
+            )}
+          />
+
+          {fotos.length > 1 && (
+            <View style={styles.counterBadge}>
+              <Text style={styles.counterText}>
+                {currentImageIndex + 1} / {fotos.length}
+              </Text>
+            </View>
+          )}
+        </View>
       ) : (
         <View style={styles.imagePlaceholder}>
           <Text style={styles.imagePlaceholderText}>Sin imagen</Text>
@@ -137,11 +190,7 @@ export default function DetalleReporte() {
         </TouchableOpacity>
       </View>
 
-      {/* 🐾 NUEVO BOTÓN */}
-      <TouchableOpacity
-        style={styles.foundButton}
-        onPress={reportarHallazgo}
-      >
+      <TouchableOpacity style={styles.foundButton} onPress={reportarHallazgo}>
         <Text style={styles.foundButtonText}>Reportar hallazgo</Text>
       </TouchableOpacity>
 
@@ -261,11 +310,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
 
+  carouselWrapper: {
+    marginBottom: 18,
+    position: "relative",
+  },
+
   image: {
-    width: "100%",
+    width: CAROUSEL_WIDTH,
     height: 260,
     borderRadius: 24,
-    marginBottom: 18,
+    marginRight: 0,
+  },
+
+  counterBadge: {
+    position: "absolute",
+    bottom: 12,
+    right: 12,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+
+  counterText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 12,
   },
 
   imagePlaceholder: {
@@ -331,7 +401,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
 
-  // 🐾 ESTILOS NUEVOS
   foundButton: {
     backgroundColor: "#ab1d85",
     paddingVertical: 16,

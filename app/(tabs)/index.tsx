@@ -19,6 +19,7 @@ import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { auth, db } from "../../config/firebase";
 
 type ReporteMascota = {
+  fotosUrls?: string[];
   fotoUrl?: string | null;
   id: string;
   nombre: string;
@@ -69,6 +70,11 @@ function HomeScreen() {
               fecha: data.fecha ?? "",
               rasgos: data.rasgos ?? "",
               ubicacion: data.ubicacion ?? "",
+              fotosUrls: Array.isArray(data.fotosUrls)
+                ? data.fotosUrls.slice(0, 5)
+                : data.fotoUrl
+                ? [data.fotoUrl]
+                : [],
               fotoUrl: data.fotoUrl ?? null,
             };
           });
@@ -117,6 +123,7 @@ function HomeScreen() {
     if (especies.length > 0) {
       filtrados = filtrados.filter((m) => especies.includes(m.tipo));
     }
+
     if (tamaños.length > 0) {
       filtrados = filtrados.filter((m) => tamaños.includes(m.tamaño));
     }
@@ -165,7 +172,10 @@ function HomeScreen() {
           <Text style={styles.reportButtonText}>Reportar mascota perdida</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.filterDots} onPress={() => setShowMenu(true)}>
+        <TouchableOpacity
+          style={styles.filterDots}
+          onPress={() => setShowMenu(true)}
+        >
           <MaterialCommunityIcons name="dots-vertical" size={28} color="#444" />
         </TouchableOpacity>
 
@@ -184,14 +194,18 @@ function HomeScreen() {
                   style={getMenuItemStyle("especie", "Perro")}
                   onPress={() => aplicarFiltro("especie", "Perro")}
                 >
-                  <Text style={getMenuTextStyle("especie", "Perro")}>Perros</Text>
+                  <Text style={getMenuTextStyle("especie", "Perro")}>
+                    Perros
+                  </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={getMenuItemStyle("especie", "Gato")}
                   onPress={() => aplicarFiltro("especie", "Gato")}
                 >
-                  <Text style={getMenuTextStyle("especie", "Gato")}>Gatos</Text>
+                  <Text style={getMenuTextStyle("especie", "Gato")}>
+                    Gatos
+                  </Text>
                 </TouchableOpacity>
 
                 <View style={styles.divider} />
@@ -202,27 +216,41 @@ function HomeScreen() {
                   style={getMenuItemStyle("tamaño", "Pequeño")}
                   onPress={() => aplicarFiltro("tamaño", "Pequeño")}
                 >
-                  <Text style={getMenuTextStyle("tamaño", "Pequeño")}>Pequeño</Text>
+                  <Text style={getMenuTextStyle("tamaño", "Pequeño")}>
+                    Pequeño
+                  </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={getMenuItemStyle("tamaño", "Mediano")}
                   onPress={() => aplicarFiltro("tamaño", "Mediano")}
                 >
-                  <Text style={getMenuTextStyle("tamaño", "Mediano")}>Mediano</Text>
+                  <Text style={getMenuTextStyle("tamaño", "Mediano")}>
+                    Mediano
+                  </Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={getMenuItemStyle("tamaño", "Grande")}
                   onPress={() => aplicarFiltro("tamaño", "Grande")}
                 >
-                  <Text style={getMenuTextStyle("tamaño", "Grande")}>Grande</Text>
+                  <Text style={getMenuTextStyle("tamaño", "Grande")}>
+                    Grande
+                  </Text>
                 </TouchableOpacity>
 
                 <View style={styles.divider} />
 
-                <TouchableOpacity style={styles.menuItem} onPress={limpiarFiltros}>
-                  <Text style={[styles.menuText, { color: "#7B61FF", fontWeight: "bold" }]}>
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={limpiarFiltros}
+                >
+                  <Text
+                    style={[
+                      styles.menuText,
+                      { color: "#7B61FF", fontWeight: "bold" },
+                    ]}
+                  >
                     Limpiar filtros
                   </Text>
                 </TouchableOpacity>
@@ -254,11 +282,26 @@ function HomeScreen() {
           >
             <View style={styles.cardContent}>
               <View style={styles.imageBox}>
-                {item.fotoUrl ? (
-                  <Image source={{ uri: item.fotoUrl }} style={styles.petImage} />
+                {item.fotosUrls && item.fotosUrls.length > 1 && (
+                  <View style={styles.multiBadge}>
+                    <Text style={styles.multiBadgeText}>
+                      +{item.fotosUrls.length - 1}
+                    </Text>
+                  </View>
+                )}
+
+                {item.fotosUrls && item.fotosUrls.length > 0 ? (
+                  <Image
+                    source={{ uri: item.fotosUrls[0] }}
+                    style={styles.petImage}
+                  />
                 ) : (
                   <View style={styles.imagePlaceholder}>
-                    <MaterialCommunityIcons name="image" size={40} color="#9F8CFF" />
+                    <MaterialCommunityIcons
+                      name="image"
+                      size={40}
+                      color="#9F8CFF"
+                    />
                   </View>
                 )}
               </View>
@@ -268,7 +311,8 @@ function HomeScreen() {
                 <Text style={styles.petDetails}>Raza: {item.raza}</Text>
                 <Text style={styles.petDetails}>Fecha: {item.fecha}</Text>
                 <Text style={styles.petDetails}>
-                  <Text style={{ fontWeight: "bold" }}>Rasgos:</Text> {item.rasgos}
+                  <Text style={{ fontWeight: "bold" }}>Rasgos:</Text>{" "}
+                  {item.rasgos}
                 </Text>
                 <Text style={styles.petLocation}>{item.ubicacion}</Text>
               </View>
@@ -287,22 +331,29 @@ function HomeScreen() {
 export default HomeScreen;
 
 const styles = StyleSheet.create({
-  imageBox: {
-    width: 100,
-    height: 100,
-    borderRadius: 12,
-    overflow: "hidden",
-    backgroundColor: "#F1EDFF",
+  container: {
+    flex: 1,
+    backgroundColor: "#F6F2FF",
+    paddingHorizontal: 20,
   },
-  petImage: {
-    width: "100%",
-    height: "100%",
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "transparent",
   },
-  container: { flex: 1, backgroundColor: "#F6F2FF", paddingHorizontal: 20 },
-  modalOverlay: { flex: 1, backgroundColor: "transparent" },
-  header: { alignItems: "center", marginTop: 30, marginBottom: 20 },
-  title: { fontSize: 26, fontWeight: "bold", color: "#5E35B1" },
-  subtitle: { fontSize: 16, color: "#777" },
+  header: {
+    alignItems: "center",
+    marginTop: 30,
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: "bold",
+    color: "#5E35B1",
+  },
+  subtitle: {
+    fontSize: 16,
+    color: "#777",
+  },
   actionRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -319,8 +370,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  reportButtonText: { color: "white", fontWeight: "bold", marginLeft: 10 },
-  filterDots: { width: 40, alignItems: "flex-end" },
+  reportButtonText: {
+    color: "white",
+    fontWeight: "bold",
+    marginLeft: 10,
+  },
+  filterDots: {
+    width: 40,
+    alignItems: "flex-end",
+  },
   androidMenu: {
     position: "absolute",
     backgroundColor: "white",
@@ -340,11 +398,26 @@ const styles = StyleSheet.create({
     marginBottom: 5,
     fontWeight: "bold",
   },
-  menuItem: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 8 },
-  menuItemActive: { backgroundColor: "#EFE9FF" },
-  menuText: { fontSize: 15 },
-  menuTextActive: { color: "#7B61FF", fontWeight: "bold" },
-  divider: { height: 1, backgroundColor: "#eee", marginVertical: 5 },
+  menuItem: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  menuItemActive: {
+    backgroundColor: "#EFE9FF",
+  },
+  menuText: {
+    fontSize: 15,
+  },
+  menuTextActive: {
+    color: "#7B61FF",
+    fontWeight: "bold",
+  },
+  divider: {
+    height: 1,
+    backgroundColor: "#eee",
+    marginVertical: 5,
+  },
   card: {
     backgroundColor: "white",
     borderRadius: 16,
@@ -353,7 +426,22 @@ const styles = StyleSheet.create({
     padding: 15,
     marginBottom: 20,
   },
-  cardContent: { flexDirection: "row", marginBottom: 15 },
+  cardContent: {
+    flexDirection: "row",
+    marginBottom: 15,
+  },
+  imageBox: {
+    width: 100,
+    height: 100,
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: "#F1EDFF",
+    position: "relative",
+  },
+  petImage: {
+    width: "100%",
+    height: "100%",
+  },
   imagePlaceholder: {
     width: 100,
     height: 100,
@@ -362,10 +450,47 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  infoContainer: { marginLeft: 15, flex: 1 },
-  petName: { fontSize: 20, fontWeight: "bold", color: "#5E35B1" },
-  petDetails: { fontSize: 13, color: "#666" },
-  petLocation: { fontSize: 12, color: "#999", marginTop: 5 },
-  foundButton: { backgroundColor: "#9F8CFF", padding: 12, borderRadius: 25, alignItems: "center" },
-  foundButtonText: { color: "white", fontWeight: "bold" },
+  multiBadge: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    zIndex: 2,
+  },
+  multiBadgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "bold",
+  },
+  infoContainer: {
+    marginLeft: 15,
+    flex: 1,
+  },
+  petName: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#5E35B1",
+  },
+  petDetails: {
+    fontSize: 13,
+    color: "#666",
+  },
+  petLocation: {
+    fontSize: 12,
+    color: "#999",
+    marginTop: 5,
+  },
+  foundButton: {
+    backgroundColor: "#9F8CFF",
+    padding: 12,
+    borderRadius: 25,
+    alignItems: "center",
+  },
+  foundButtonText: {
+    color: "white",
+    fontWeight: "bold",
+  },
 });

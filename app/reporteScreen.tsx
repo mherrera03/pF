@@ -20,11 +20,11 @@ import {
 
 import DateTimePicker from "@react-native-community/datetimepicker";
 
-// ✅ Firestore
+// Firestore
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../config/firebase";
 
-// ✅ ImageKit uploader
+// ImageKit uploader
 import { uploadToImageKit } from "../services/imageUpload";
 
 const formatDateDDMMYYYY = (d: Date) => {
@@ -38,7 +38,7 @@ export default function ReporteScreen() {
   const router = useRouter();
 
   const [tipoReporte, setTipoReporte] = useState<"rapido" | "completo">("rapido");
-  const [image, setImage] = useState<string | null>(null);
+  const [images, setImages] = useState<string[]>([]);
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -46,8 +46,16 @@ export default function ReporteScreen() {
 
   const animatePress = () => {
     Animated.sequence([
-      Animated.timing(scaleAnim, { toValue: 1.08, duration: 100, useNativeDriver: true }),
-      Animated.timing(scaleAnim, { toValue: 1, duration: 100, useNativeDriver: true }),
+      Animated.timing(scaleAnim, {
+        toValue: 1.08,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
     ]).start();
   };
 
@@ -71,39 +79,60 @@ export default function ReporteScreen() {
     setFormData((prev) => ({ ...prev, [campo]: valor }));
   };
 
-  const pickImage = async () => {
+  const pickImages = async () => {
+    if (images.length >= 5) {
+      Alert.alert("Límite alcanzado", "Solo puedes agregar hasta 5 imágenes.");
+      return;
+    }
+
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permission.granted) {
-      Alert.alert("Permiso requerido", "Necesitamos acceso a tu galería");
+      Alert.alert("Permiso requerido", "Necesitamos acceso a tu galería.");
       return;
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 1,
+      allowsMultipleSelection: true,
+      selectionLimit: 5 - images.length,
+      quality: 0.8,
     });
 
-    if (!result.canceled) setImage(result.assets[0].uri);
+    if (result.canceled) return;
+
+    const nuevasUris = result.assets.map((asset) => asset.uri);
+    const combinadas = [...images, ...nuevasUris].slice(0, 5);
+
+    setImages(combinadas);
+  };
+
+  const removeImage = (indexToRemove: number) => {
+    setImages((prev) => prev.filter((_, index) => index !== indexToRemove));
   };
 
   const getLocation = async () => {
-    let { status } = await Location.requestForegroundPermissionsAsync();
+    const { status } = await Location.requestForegroundPermissionsAsync();
 
     if (status !== "granted") {
-      Alert.alert("Permiso requerido", "Activa la ubicación");
+      Alert.alert("Permiso requerido", "Activa la ubicación.");
       return;
     }
 
-    let location = await Location.getCurrentPositionAsync({});
-    setCoords({ latitude: location.coords.latitude, longitude: location.coords.longitude });
+    const location = await Location.getCurrentPositionAsync({});
+    setCoords({
+      latitude: location.coords.latitude,
+      longitude: location.coords.longitude,
+    });
   };
 
   const validar = () => {
     if (!formData.nombre.trim()) return "Escribe el nombre de la mascota.";
     if (!formData.especie) return "Selecciona la especie (Perro/Gato).";
     if (!formData.raza) return "Selecciona la raza.";
-    if (formData.raza === "Otro" && !formData.razaOtro.trim()) return "Escribe la raza de la mascota.";
+    if (formData.raza === "Otro" && !formData.razaOtro.trim()) {
+      return "Escribe la raza de la mascota.";
+    }
     if (!formData.telefono.trim()) return "Escribe un teléfono.";
     if (!coords) return "Obtén la ubicación actual.";
 
@@ -132,13 +161,21 @@ export default function ReporteScreen() {
       const user = auth.currentUser;
       const uid = user?.uid ?? null;
 
-      let fotoUrl: string | null = null;
-      if (image) {
-        const res = await uploadToImageKit(image);
-        fotoUrl = typeof res === "string" ? res : (res?.url ?? null);
+      const uploadedUrls: string[] = [];
+
+      for (const uri of images) {
+        const res = await uploadToImageKit(uri);
+        const url = typeof res === "string" ? res : res?.url ?? null;
+
+        if (url) {
+          uploadedUrls.push(url);
+        }
       }
 
-      const razaFinal = formData.raza === "Otro" ? formData.razaOtro.trim() : formData.raza.trim();
+      const razaFinal =
+        formData.raza === "Otro"
+          ? formData.razaOtro.trim()
+          : formData.raza.trim();
 
       await addDoc(collection(db, "reportes"), {
         nombre: formData.nombre.trim(),
@@ -152,12 +189,20 @@ export default function ReporteScreen() {
         rasgos: tipoReporte === "completo" ? formData.rasgos.trim() : null,
 
         recompensa: formData.ofreceRecompensa === "si",
-        montoRecompensa: formData.ofreceRecompensa === "si" ? formData.montoRecompensa.trim() : null,
+        montoRecompensa:
+          formData.ofreceRecompensa === "si"
+            ? formData.montoRecompensa.trim()
+            : null,
 
-        coords: coords ? { latitude: coords.latitude, longitude: coords.longitude } : null,
-        ubicacion: coords ? `${coords.latitude}, ${coords.longitude}` : null,
+        coords: coords
+          ? { latitude: coords.latitude, longitude: coords.longitude }
+          : null,
+        ubicacion: coords
+          ? `${coords.latitude}, ${coords.longitude}`
+          : null,
 
-        fotoUrl,
+        fotosUrls: uploadedUrls.slice(0, 5),
+        fotoUrl: uploadedUrls.length > 0 ? uploadedUrls[0] : null,
         tipoReporte,
 
         createdAt: serverTimestamp(),
@@ -213,7 +258,11 @@ export default function ReporteScreen() {
       : [];
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 150 }} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ paddingBottom: 150 }}
+      showsVerticalScrollIndicator={false}
+    >
       <StatusBar barStyle="light-content" />
       <Text style={styles.title}>Nuevo Reporte</Text>
 
@@ -221,11 +270,19 @@ export default function ReporteScreen() {
         {["rapido", "completo"].map((tipo) => (
           <TouchableOpacity
             key={tipo}
-            style={[styles.toggleButton, tipoReporte === tipo && styles.activeToggle]}
+            style={[
+              styles.toggleButton,
+              tipoReporte === tipo && styles.activeToggle,
+            ]}
             onPress={() => setTipoReporte(tipo as "rapido" | "completo")}
             disabled={submitting}
           >
-            <Text style={[styles.toggleText, tipoReporte === tipo && styles.activeText]}>
+            <Text
+              style={[
+                styles.toggleText,
+                tipoReporte === tipo && styles.activeText,
+              ]}
+            >
               {tipo === "rapido" ? "Reporte Rápido" : "Reporte Completo"}
             </Text>
           </TouchableOpacity>
@@ -245,7 +302,10 @@ export default function ReporteScreen() {
         {["Perro", "Gato"].map((esp) => (
           <Animated.View key={esp} style={{ transform: [{ scale: scaleAnim }] }}>
             <TouchableOpacity
-              style={[styles.chip, formData.especie === esp && styles.chipActive]}
+              style={[
+                styles.chip,
+                formData.especie === esp && styles.chipActive,
+              ]}
               onPress={() => {
                 handleChange("especie", esp);
                 handleChange("raza", "");
@@ -254,7 +314,12 @@ export default function ReporteScreen() {
               }}
               disabled={submitting}
             >
-              <Text style={[styles.chipText, formData.especie === esp && styles.chipTextActive]}>
+              <Text
+                style={[
+                  styles.chipText,
+                  formData.especie === esp && styles.chipTextActive,
+                ]}
+              >
                 {esp}
               </Text>
             </TouchableOpacity>
@@ -305,7 +370,9 @@ export default function ReporteScreen() {
         onPress={() => setShowDatePicker(true)}
         disabled={submitting}
       >
-        <Text style={styles.dateText}>Seleccionar fecha: {formatDateDDMMYYYY(fechaDate)}</Text>
+        <Text style={styles.dateText}>
+          Seleccionar fecha: {formatDateDDMMYYYY(fechaDate)}
+        </Text>
       </TouchableOpacity>
 
       {showDatePicker && (
@@ -320,7 +387,11 @@ export default function ReporteScreen() {
 
       <Text style={styles.label}>Color</Text>
       <View style={styles.pickerContainer}>
-        <Picker selectedValue={formData.color} onValueChange={(v) => handleChange("color", v)} enabled={!submitting}>
+        <Picker
+          selectedValue={formData.color}
+          onValueChange={(v) => handleChange("color", v)}
+          enabled={!submitting}
+        >
           <Picker.Item label="Seleccionar color..." value="" />
           <Picker.Item label="Blanco" value="Blanco" />
           <Picker.Item label="Negro" value="Negro" />
@@ -333,14 +404,20 @@ export default function ReporteScreen() {
       </View>
 
       <Text style={styles.label}>Ubicación</Text>
-      <TouchableOpacity style={styles.locationButton} onPress={getLocation} disabled={submitting}>
+      <TouchableOpacity
+        style={styles.locationButton}
+        onPress={getLocation}
+        disabled={submitting}
+      >
         <Text style={styles.locationText}>Obtener ubicación actual</Text>
       </TouchableOpacity>
 
       {coords && (
         <TouchableOpacity
           onPress={() =>
-            Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${coords.latitude},${coords.longitude}`)
+            Linking.openURL(
+              `https://www.google.com/maps/search/?api=1&query=${coords.latitude},${coords.longitude}`
+            )
           }
         >
           <Text style={styles.mapPreview}>Ver en Google Maps</Text>
@@ -362,9 +439,15 @@ export default function ReporteScreen() {
           { label: "Sí", value: "si" },
           { label: "No", value: "no" },
         ].map((item) => (
-          <Animated.View key={item.value} style={{ transform: [{ scale: scaleAnim }] }}>
+          <Animated.View
+            key={item.value}
+            style={{ transform: [{ scale: scaleAnim }] }}
+          >
             <TouchableOpacity
-              style={[styles.chip, formData.ofreceRecompensa === item.value && styles.chipActive]}
+              style={[
+                styles.chip,
+                formData.ofreceRecompensa === item.value && styles.chipActive,
+              ]}
               onPress={() => {
                 handleChange("ofreceRecompensa", item.value);
                 if (item.value === "no") handleChange("montoRecompensa", "");
@@ -375,7 +458,8 @@ export default function ReporteScreen() {
               <Text
                 style={[
                   styles.chipText,
-                  formData.ofreceRecompensa === item.value && styles.chipTextActive,
+                  formData.ofreceRecompensa === item.value &&
+                    styles.chipTextActive,
                 ]}
               >
                 {item.label}
@@ -396,27 +480,62 @@ export default function ReporteScreen() {
         />
       )}
 
-      <TouchableOpacity style={styles.photoButton} onPress={pickImage} disabled={submitting}>
-        <Text style={styles.photoText}>{image ? "Cambiar Foto" : "Agregar Foto"}</Text>
+      <TouchableOpacity
+        style={styles.photoButton}
+        onPress={pickImages}
+        disabled={submitting}
+      >
+        <Text style={styles.photoText}>
+          {images.length > 0
+            ? `Agregar o cambiar fotos (${images.length}/5)`
+            : "Agregar fotos"}
+        </Text>
       </TouchableOpacity>
 
-      {image && <Image source={{ uri: image }} style={styles.previewImage} />}
+      <View style={styles.previewGrid}>
+        {images.map((uri, index) => (
+          <View key={`${uri}-${index}`} style={styles.previewItem}>
+            <Image source={{ uri }} style={styles.previewImage} />
+
+            <TouchableOpacity
+              style={styles.removeBadge}
+              onPress={() => removeImage(index)}
+              disabled={submitting}
+            >
+              <Text style={styles.removeBadgeText}>×</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+      </View>
 
       {tipoReporte === "completo" && (
         <>
           <Text style={styles.label}>Tamaño</Text>
           <View style={styles.wrapRow}>
             {["Pequeño", "Mediano", "Grande"].map((size) => (
-              <Animated.View key={size} style={{ transform: [{ scale: scaleAnim }] }}>
+              <Animated.View
+                key={size}
+                style={{ transform: [{ scale: scaleAnim }] }}
+              >
                 <TouchableOpacity
-                  style={[styles.chip, formData.tamaño === size && styles.chipActive]}
+                  style={[
+                    styles.chip,
+                    formData.tamaño === size && styles.chipActive,
+                  ]}
                   onPress={() => {
                     handleChange("tamaño", size);
                     animatePress();
                   }}
                   disabled={submitting}
                 >
-                  <Text style={[styles.chipText, formData.tamaño === size && styles.chipTextActive]}>{size}</Text>
+                  <Text
+                    style={[
+                      styles.chipText,
+                      formData.tamaño === size && styles.chipTextActive,
+                    ]}
+                  >
+                    {size}
+                  </Text>
                 </TouchableOpacity>
               </Animated.View>
             ))}
@@ -433,9 +552,17 @@ export default function ReporteScreen() {
         </>
       )}
 
-      <TouchableOpacity style={[styles.submitButton, submitting && { opacity: 0.7 }]} onPress={handleSubmit} disabled={submitting}>
+      <TouchableOpacity
+        style={[styles.submitButton, submitting && { opacity: 0.7 }]}
+        onPress={handleSubmit}
+        disabled={submitting}
+      >
         <Text style={styles.submitText}>
-          {submitting ? "Publicando..." : tipoReporte === "rapido" ? "Publicar Reporte Rápido" : "Publicar Reporte Completo"}
+          {submitting
+            ? "Publicando..."
+            : tipoReporte === "rapido"
+            ? "Publicar Reporte Rápido"
+            : "Publicar Reporte Completo"}
         </Text>
       </TouchableOpacity>
     </ScrollView>
@@ -443,42 +570,186 @@ export default function ReporteScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F4ECFF", padding: 20 },
+  container: {
+    flex: 1,
+    backgroundColor: "#F4ECFF",
+    padding: 20,
+  },
 
-  title: { fontSize: 24, fontWeight: "bold", color: "#6A5ACD", textAlign: "center", marginBottom: 25, marginTop: 15 },
+  title: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#6A5ACD",
+    textAlign: "center",
+    marginBottom: 25,
+    marginTop: 15,
+  },
 
-  toggleContainer: { flexDirection: "row", marginBottom: 20 },
-  toggleButton: { flex: 1, padding: 12, borderRadius: 25, backgroundColor: "#E5D9FF", marginHorizontal: 5, alignItems: "center" },
-  activeToggle: { backgroundColor: "#6A5ACD" },
-  toggleText: { color: "#6A5ACD", fontWeight: "600" },
-  activeText: { color: "#fff" },
+  toggleContainer: {
+    flexDirection: "row",
+    marginBottom: 20,
+  },
+  toggleButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 25,
+    backgroundColor: "#E5D9FF",
+    marginHorizontal: 5,
+    alignItems: "center",
+  },
+  activeToggle: {
+    backgroundColor: "#6A5ACD",
+  },
+  toggleText: {
+    color: "#6A5ACD",
+    fontWeight: "600",
+  },
+  activeText: {
+    color: "#fff",
+  },
 
-  input: { backgroundColor: "#fff", borderRadius: 18, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: "#D6C8FF" },
+  input: {
+    backgroundColor: "#fff",
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: "#D6C8FF",
+  },
 
-  label: { fontWeight: "600", color: "#6A5ACD", marginBottom: 8, marginTop: 10 },
+  label: {
+    fontWeight: "600",
+    color: "#6A5ACD",
+    marginBottom: 8,
+    marginTop: 10,
+  },
 
-  wrapRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", alignItems: "center", marginBottom: 15 },
+  wrapRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 15,
+  },
 
-  chip: { backgroundColor: "#E5D9FF", paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, margin: 6 },
-  chipActive: { backgroundColor: "#6A5ACD" },
-  chipText: { color: "#5A4FCF", fontWeight: "600" },
-  chipTextActive: { color: "#fff" },
+  chip: {
+    backgroundColor: "#E5D9FF",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    margin: 6,
+  },
+  chipActive: {
+    backgroundColor: "#6A5ACD",
+  },
+  chipText: {
+    color: "#5A4FCF",
+    fontWeight: "600",
+  },
+  chipTextActive: {
+    color: "#fff",
+  },
 
-  pickerContainer: { backgroundColor: "#fff", borderRadius: 18, borderWidth: 1, borderColor: "#D6C8FF", marginBottom: 15 },
+  pickerContainer: {
+    backgroundColor: "#fff",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#D6C8FF",
+    marginBottom: 15,
+  },
 
-  locationButton: { backgroundColor: "#D6C8FF", padding: 14, borderRadius: 20, alignItems: "center", marginBottom: 10 },
-  locationText: { color: "#4B3FBF", fontWeight: "600" },
+  locationButton: {
+    backgroundColor: "#D6C8FF",
+    padding: 14,
+    borderRadius: 20,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  locationText: {
+    color: "#4B3FBF",
+    fontWeight: "600",
+  },
 
-  mapPreview: { textAlign: "center", color: "#6A5ACD", marginBottom: 15, textDecorationLine: "underline" },
+  mapPreview: {
+    textAlign: "center",
+    color: "#6A5ACD",
+    marginBottom: 15,
+    textDecorationLine: "underline",
+  },
 
-  photoButton: { backgroundColor: "#D6C8FF", padding: 14, borderRadius: 20, alignItems: "center", marginBottom: 12 },
-  photoText: { color: "#4B3FBF", fontWeight: "600" },
+  photoButton: {
+    backgroundColor: "#D6C8FF",
+    padding: 14,
+    borderRadius: 20,
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  photoText: {
+    color: "#4B3FBF",
+    fontWeight: "600",
+  },
 
-  previewImage: { width: "100%", height: 200, borderRadius: 20, marginBottom: 20 },
+  previewGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 20,
+  },
+  previewItem: {
+    width: 100,
+    height: 100,
+    borderRadius: 16,
+    overflow: "hidden",
+    position: "relative",
+    backgroundColor: "#EDE7FF",
+  },
+  previewImage: {
+    width: "100%",
+    height: "100%",
+  },
+  removeBadge: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  removeBadgeText: {
+    color: "#fff",
+    fontSize: 18,
+    lineHeight: 20,
+    fontWeight: "bold",
+  },
 
-  dateButton: { backgroundColor: "#FFFFFF", borderRadius: 18, padding: 14, borderWidth: 1, borderColor: "#D6C8FF", marginBottom: 10 },
-  dateText: { color: "#4B3FBF", fontWeight: "600" },
+  dateButton: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#D6C8FF",
+    marginBottom: 10,
+  },
+  dateText: {
+    color: "#4B3FBF",
+    fontWeight: "600",
+  },
 
-  submitButton: { backgroundColor: "#5A4FCF", padding: 18, borderRadius: 30, alignItems: "center", marginTop: 10, marginBottom: 40, elevation: 4 },
-  submitText: { color: "#fff", fontWeight: "bold", fontSize: 15 },
+  submitButton: {
+    backgroundColor: "#5A4FCF",
+    padding: 18,
+    borderRadius: 30,
+    alignItems: "center",
+    marginTop: 10,
+    marginBottom: 40,
+    elevation: 4,
+  },
+  submitText: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: 15,
+  },
 });
