@@ -47,8 +47,8 @@ export default function Login() {
             onChangeText={setPassword}
             secureTextEntry={!showPassword}
             placeholderTextColor="#999"
-            returnKeyType="done" // Cambia el botón del teclado a "Hecho/Realizado"
-            onSubmitEditing={onLogin} // <--- ESTO ejecuta el login al darle al teclado
+            returnKeyType="done" 
+            onSubmitEditing={onLogin} 
           />
 
           <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
