@@ -1,8 +1,19 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import {
+  sendPasswordResetEmail,
+  signInWithEmailAndPassword,
+} from "firebase/auth";
 import { useState } from "react";
-import { Alert, Button, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import {
+  Alert,
+  Button,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { auth } from "../config/firebase";
 
 export default function Login() {
@@ -15,11 +26,44 @@ export default function Login() {
       Alert.alert("Error", "Completa correo y contraseña.");
       return;
     }
+
     try {
       await signInWithEmailAndPassword(auth, email.trim(), password);
       router.replace("/(tabs)");
     } catch {
       Alert.alert("Error", "Credenciales incorrectas.");
+    }
+  };
+
+  const onForgotPassword = async () => {
+    const cleanEmail = email.trim();
+
+    if (!cleanEmail) {
+      Alert.alert(
+        "Correo requerido",
+        "Escribe tu correo para enviarte el enlace de recuperación."
+      );
+      return;
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, cleanEmail);
+      Alert.alert(
+        "Correo enviado",
+        "Te enviamos un enlace para restablecer tu contraseña."
+      );
+    } catch (error: any) {
+      if (error?.code === "auth/user-not-found") {
+        Alert.alert("Error", "No existe una cuenta con ese correo.");
+        return;
+      }
+
+      if (error?.code === "auth/invalid-email") {
+        Alert.alert("Error", "El correo no es válido.");
+        return;
+      }
+
+      Alert.alert("Error", "No se pudo enviar el correo de recuperación.");
     }
   };
 
@@ -36,7 +80,7 @@ export default function Login() {
           autoCapitalize="none"
           keyboardType="email-address"
           placeholderTextColor="#999"
-          returnKeyType="next" 
+          returnKeyType="next"
         />
 
         <View style={styles.passwordContainer}>
@@ -47,8 +91,8 @@ export default function Login() {
             onChangeText={setPassword}
             secureTextEntry={!showPassword}
             placeholderTextColor="#999"
-            returnKeyType="done" 
-            onSubmitEditing={onLogin} 
+            returnKeyType="done"
+            onSubmitEditing={onLogin}
           />
 
           <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
@@ -60,12 +104,20 @@ export default function Login() {
           </TouchableOpacity>
         </View>
 
+        <TouchableOpacity onPress={onForgotPassword}>
+          <Text style={styles.forgotText}>¿Olvidaste tu contraseña?</Text>
+        </TouchableOpacity>
+
         <View style={styles.button}>
           <Button title="Entrar" onPress={onLogin} color="#863ac9" />
         </View>
 
         <View style={styles.button}>
-          <Button title="Registrarse" onPress={() => router.push("/registro")} color="#5bb7b4" />
+          <Button
+            title="Registrarse"
+            onPress={() => router.push("/registro")}
+            color="#5bb7b4"
+          />
         </View>
       </View>
     </View>
@@ -115,6 +167,12 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 14,
     fontSize: 16,
+  },
+  forgotText: {
+    textAlign: "right",
+    color: "#863ac9",
+    fontWeight: "600",
+    marginTop: -2,
   },
   button: {
     borderRadius: 12,
