@@ -27,6 +27,12 @@ import { auth, db } from "../config/firebase";
 // ImageKit uploader
 import { uploadToImageKit } from "../services/imageUpload";
 
+// Validador de imágenes
+import {
+  validateManyPetImages,
+  type ExpectedPetType,
+} from "../services/petImageValidator";
+
 const formatDateDDMMYYYY = (d: Date) => {
   const dd = String(d.getDate()).padStart(2, "0");
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -41,6 +47,8 @@ export default function ReporteScreen() {
   const [images, setImages] = useState<string[]>([]);
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [validatingImages, setValidatingImages] = useState(false);
+  const [imageValidationSummary, setImageValidationSummary] = useState<string | null>(null);
 
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -79,6 +87,12 @@ export default function ReporteScreen() {
     setFormData((prev) => ({ ...prev, [campo]: valor }));
   };
 
+  const mapSpeciesToExpectedType = (especie: string): ExpectedPetType | null => {
+    if (especie === "Perro") return "dog";
+    if (especie === "Gato") return "cat";
+    return null;
+  };
+
   const pickImages = async () => {
     if (images.length >= 5) {
       Alert.alert("Límite alcanzado", "Solo puedes agregar hasta 5 imágenes.");
@@ -105,10 +119,12 @@ export default function ReporteScreen() {
     const combinadas = [...images, ...nuevasUris].slice(0, 5);
 
     setImages(combinadas);
+    setImageValidationSummary(null);
   };
 
   const removeImage = (indexToRemove: number) => {
     setImages((prev) => prev.filter((_, index) => index !== indexToRemove));
+    setImageValidationSummary(null);
   };
 
   const getLocation = async () => {
@@ -126,6 +142,67 @@ export default function ReporteScreen() {
     });
   };
 
+  const validateSelectedImages = async () => {
+    if (!formData.especie) {
+      Alert.alert("Falta información", "Primero selecciona la especie antes de validar fotos.");
+      return false;
+    }
+
+    if (images.length === 0) {
+      Alert.alert("Falta información", "Agrega al menos una foto.");
+      return false;
+    }
+
+    const expectedType = mapSpeciesToExpectedType(formData.especie);
+
+    if (!expectedType) {
+      Alert.alert("Error", "La especie seleccionada no es válida.");
+      return false;
+    }
+
+    try {
+      setValidatingImages(true);
+      setImageValidationSummary(null);
+
+      const results = await validateManyPetImages(images, expectedType);
+
+      const invalidOnes = results.filter((item) => item.decision === "reject");
+      const warningOnes = results.filter((item) => item.decision === "warning");
+
+      if (invalidOnes.length > 0) {
+        const detalle = invalidOnes
+          .map((item, index) => {
+            const originalIndex = results.findIndex((r) => r.uri === item.uri);
+            return `Imagen ${originalIndex + 1}: ${item.message}`;
+          })
+          .join("\n");
+
+        Alert.alert(
+          "Imágenes no válidas",
+          `Algunas fotos no coinciden con la especie seleccionada.\n\n${detalle}`
+        );
+
+        setImageValidationSummary("Hay imágenes rechazadas.");
+        return false;
+      }
+
+      if (warningOnes.length > 0) {
+        setImageValidationSummary(
+          `${warningOnes.length} imagen(es) coinciden, pero con confianza media.`
+        );
+      } else {
+        setImageValidationSummary("Todas las imágenes fueron validadas correctamente.");
+      }
+
+      return true;
+    } catch (error: any) {
+      Alert.alert("Error", error.message || "No se pudieron validar las imágenes.");
+      return false;
+    } finally {
+      setValidatingImages(false);
+    }
+  };
+
   const validar = () => {
     if (!formData.nombre.trim()) return "Escribe el nombre de la mascota.";
     if (!formData.especie) return "Selecciona la especie (Perro/Gato).";
@@ -133,6 +210,7 @@ export default function ReporteScreen() {
     if (formData.raza === "Otro" && !formData.razaOtro.trim()) {
       return "Escribe la raza de la mascota.";
     }
+    if (images.length === 0) return "Agrega al menos una foto de la mascota.";
     if (!formData.telefono.trim()) return "Escribe un teléfono.";
     if (!coords) return "Obtén la ubicación actual.";
 
@@ -152,6 +230,11 @@ export default function ReporteScreen() {
     const error = validar();
     if (error) {
       Alert.alert("Falta información", error);
+      return;
+    }
+
+    const imagesAreValid = await validateSelectedImages();
+    if (!imagesAreValid) {
       return;
     }
 
@@ -275,7 +358,7 @@ export default function ReporteScreen() {
               tipoReporte === tipo && styles.activeToggle,
             ]}
             onPress={() => setTipoReporte(tipo as "rapido" | "completo")}
-            disabled={submitting}
+            disabled={submitting || validatingImages}
           >
             <Text
               style={[
@@ -294,7 +377,7 @@ export default function ReporteScreen() {
         placeholder="Nombre de la mascota"
         value={formData.nombre}
         onChangeText={(text) => handleChange("nombre", text)}
-        editable={!submitting}
+        editable={!submitting && !validatingImages}
       />
 
       <Text style={styles.label}>Especie</Text>
@@ -310,9 +393,10 @@ export default function ReporteScreen() {
                 handleChange("especie", esp);
                 handleChange("raza", "");
                 handleChange("razaOtro", "");
+                setImageValidationSummary(null);
                 animatePress();
               }}
-              disabled={submitting}
+              disabled={submitting || validatingImages}
             >
               <Text
                 style={[
@@ -337,7 +421,7 @@ export default function ReporteScreen() {
               handleChange("razaOtro", "");
             }
           }}
-          enabled={!submitting && !!formData.especie}
+          enabled={!submitting && !validatingImages && !!formData.especie}
         >
           <Picker.Item
             label={
@@ -360,7 +444,7 @@ export default function ReporteScreen() {
           placeholder="Escribe la raza de la mascota"
           value={formData.razaOtro}
           onChangeText={(text) => handleChange("razaOtro", text)}
-          editable={!submitting}
+          editable={!submitting && !validatingImages}
         />
       )}
 
@@ -368,7 +452,7 @@ export default function ReporteScreen() {
       <TouchableOpacity
         style={styles.dateButton}
         onPress={() => setShowDatePicker(true)}
-        disabled={submitting}
+        disabled={submitting || validatingImages}
       >
         <Text style={styles.dateText}>
           Seleccionar fecha: {formatDateDDMMYYYY(fechaDate)}
@@ -390,7 +474,7 @@ export default function ReporteScreen() {
         <Picker
           selectedValue={formData.color}
           onValueChange={(v) => handleChange("color", v)}
-          enabled={!submitting}
+          enabled={!submitting && !validatingImages}
         >
           <Picker.Item label="Seleccionar color..." value="" />
           <Picker.Item label="Blanco" value="Blanco" />
@@ -407,7 +491,7 @@ export default function ReporteScreen() {
       <TouchableOpacity
         style={styles.locationButton}
         onPress={getLocation}
-        disabled={submitting}
+        disabled={submitting || validatingImages}
       >
         <Text style={styles.locationText}>Obtener ubicación actual</Text>
       </TouchableOpacity>
@@ -430,7 +514,7 @@ export default function ReporteScreen() {
         keyboardType="numeric"
         value={formData.telefono}
         onChangeText={(text) => handleChange("telefono", text)}
-        editable={!submitting}
+        editable={!submitting && !validatingImages}
       />
 
       <Text style={styles.label}>¿Ofreces recompensa?</Text>
@@ -453,7 +537,7 @@ export default function ReporteScreen() {
                 if (item.value === "no") handleChange("montoRecompensa", "");
                 animatePress();
               }}
-              disabled={submitting}
+              disabled={submitting || validatingImages}
             >
               <Text
                 style={[
@@ -476,14 +560,14 @@ export default function ReporteScreen() {
           keyboardType="numeric"
           value={formData.montoRecompensa}
           onChangeText={(text) => handleChange("montoRecompensa", text)}
-          editable={!submitting}
+          editable={!submitting && !validatingImages}
         />
       )}
 
       <TouchableOpacity
         style={styles.photoButton}
         onPress={pickImages}
-        disabled={submitting}
+        disabled={submitting || validatingImages}
       >
         <Text style={styles.photoText}>
           {images.length > 0
@@ -500,13 +584,21 @@ export default function ReporteScreen() {
             <TouchableOpacity
               style={styles.removeBadge}
               onPress={() => removeImage(index)}
-              disabled={submitting}
+              disabled={submitting || validatingImages}
             >
               <Text style={styles.removeBadgeText}>×</Text>
             </TouchableOpacity>
           </View>
         ))}
       </View>
+
+      {validatingImages && (
+        <Text style={styles.validationInfo}>Validando imágenes...</Text>
+      )}
+
+      {imageValidationSummary && !validatingImages && (
+        <Text style={styles.validationInfo}>{imageValidationSummary}</Text>
+      )}
 
       {tipoReporte === "completo" && (
         <>
@@ -526,7 +618,7 @@ export default function ReporteScreen() {
                     handleChange("tamaño", size);
                     animatePress();
                   }}
-                  disabled={submitting}
+                  disabled={submitting || validatingImages}
                 >
                   <Text
                     style={[
@@ -547,18 +639,23 @@ export default function ReporteScreen() {
             multiline
             value={formData.rasgos}
             onChangeText={(text) => handleChange("rasgos", text)}
-            editable={!submitting}
+            editable={!submitting && !validatingImages}
           />
         </>
       )}
 
       <TouchableOpacity
-        style={[styles.submitButton, submitting && { opacity: 0.7 }]}
+        style={[
+          styles.submitButton,
+          (submitting || validatingImages) && { opacity: 0.7 },
+        ]}
         onPress={handleSubmit}
-        disabled={submitting}
+        disabled={submitting || validatingImages}
       >
         <Text style={styles.submitText}>
-          {submitting
+          {validatingImages
+            ? "Validando imágenes..."
+            : submitting
             ? "Publicando..."
             : tipoReporte === "rapido"
             ? "Publicar Reporte Rápido"
@@ -693,7 +790,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
-    marginBottom: 20,
+    marginBottom: 10,
   },
   previewItem: {
     width: 100,
@@ -723,6 +820,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     lineHeight: 20,
     fontWeight: "bold",
+  },
+
+  validationInfo: {
+    textAlign: "center",
+    color: "#6A5ACD",
+    marginBottom: 18,
+    fontWeight: "600",
   },
 
   dateButton: {
