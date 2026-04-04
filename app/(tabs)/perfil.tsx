@@ -1,13 +1,6 @@
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
-import {
-  EmailAuthProvider,
-  onAuthStateChanged,
-  reauthenticateWithCredential,
-  signOut,
-  updatePassword,
-  updateProfile,
-} from "firebase/auth";
+import { onAuthStateChanged, signOut, updateProfile } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import {
@@ -31,10 +24,6 @@ export default function Perfil() {
 
   const [editing, setEditing] = useState(false);
   const [nameInput, setNameInput] = useState("");
-
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
@@ -68,9 +57,6 @@ export default function Perfil() {
 
   const startEdit = () => {
     setNameInput(userName);
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
     setEditing(true);
   };
 
@@ -113,9 +99,6 @@ export default function Perfil() {
   const onSaveProfile = async () => {
     const user = auth.currentUser;
     const newName = nameInput.trim();
-    const oldPass = currentPassword.trim();
-    const newPass = newPassword.trim();
-    const confirmPass = confirmPassword.trim();
 
     if (!user) {
       return Alert.alert("Error", "No hay usuario autenticado.");
@@ -123,39 +106,6 @@ export default function Perfil() {
 
     if (!newName) {
       return Alert.alert("Error", "Escribe tu nombre.");
-    }
-
-    const wantsPasswordChange = oldPass || newPass || confirmPass;
-
-    if (wantsPasswordChange) {
-      if (!user.email) {
-        return Alert.alert("Error", "No se encontró el correo del usuario.");
-      }
-
-      if (!oldPass || !newPass || !confirmPass) {
-        return Alert.alert(
-          "Error",
-          "Completa la contraseña actual, la nueva y su confirmación."
-        );
-      }
-
-      if (newPass.length < 6) {
-        return Alert.alert(
-          "Error",
-          "La nueva contraseña debe tener al menos 6 caracteres."
-        );
-      }
-
-      if (newPass !== confirmPass) {
-        return Alert.alert("Error", "Las nuevas contraseñas no coinciden.");
-      }
-
-      if (oldPass === newPass) {
-        return Alert.alert(
-          "Error",
-          "La nueva contraseña no puede ser igual a la actual."
-        );
-      }
     }
 
     try {
@@ -169,41 +119,9 @@ export default function Perfil() {
         setUserName(newName);
       }
 
-      if (wantsPasswordChange && user.email) {
-        const credential = EmailAuthProvider.credential(user.email, oldPass);
-        await reauthenticateWithCredential(user, credential);
-        await updatePassword(user, newPass);
-      }
-
       setEditing(false);
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-
       Alert.alert("Listo", "Perfil actualizado correctamente.");
-    } catch (error: any) {
-      if (error?.code === "auth/wrong-password") {
-        return Alert.alert("Error", "La contraseña actual es incorrecta.");
-      }
-
-      if (error?.code === "auth/invalid-credential") {
-        return Alert.alert("Error", "Las credenciales no son válidas.");
-      }
-
-      if (error?.code === "auth/weak-password") {
-        return Alert.alert(
-          "Error",
-          "La nueva contraseña es demasiado débil."
-        );
-      }
-
-      if (error?.code === "auth/too-many-requests") {
-        return Alert.alert(
-          "Error",
-          "Demasiados intentos. Intenta de nuevo más tarde."
-        );
-      }
-
+    } catch {
       Alert.alert("Error", "No se pudo actualizar el perfil.");
     }
   };
@@ -297,48 +215,6 @@ export default function Perfil() {
               }}
             />
 
-            <TextInput
-              value={currentPassword}
-              onChangeText={setCurrentPassword}
-              placeholder="Contraseña actual"
-              secureTextEntry
-              style={{
-                width: "100%",
-                borderWidth: 1,
-                borderColor: "#E5E7EB",
-                borderRadius: 12,
-                padding: 12,
-              }}
-            />
-
-            <TextInput
-              value={newPassword}
-              onChangeText={setNewPassword}
-              placeholder="Nueva contraseña"
-              secureTextEntry
-              style={{
-                width: "100%",
-                borderWidth: 1,
-                borderColor: "#E5E7EB",
-                borderRadius: 12,
-                padding: 12,
-              }}
-            />
-
-            <TextInput
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              placeholder="Confirmar nueva contraseña"
-              secureTextEntry
-              style={{
-                width: "100%",
-                borderWidth: 1,
-                borderColor: "#E5E7EB",
-                borderRadius: 12,
-                padding: 12,
-              }}
-            />
-
             <TouchableOpacity
               onPress={onSaveProfile}
               style={{
@@ -354,14 +230,7 @@ export default function Perfil() {
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={() => {
-                setEditing(false);
-                setCurrentPassword("");
-                setNewPassword("");
-                setConfirmPassword("");
-              }}
-            >
+            <TouchableOpacity onPress={() => setEditing(false)}>
               <Text style={{ color: "#777", marginTop: 6 }}>Cancelar</Text>
             </TouchableOpacity>
           </>

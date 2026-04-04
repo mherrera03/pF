@@ -8,7 +8,14 @@ export default function ConfiguracionSoporte() {
       contentContainerStyle={{ padding: 20, paddingBottom: 40 }}
     >
       <TouchableOpacity onPress={() => router.back()}>
-        <Text style={{ color: "#4DB6AC", fontWeight: "700", marginBottom: 16, marginTop:15 }}>
+        <Text
+          style={{
+            color: "#4DB6AC",
+            fontWeight: "700",
+            marginBottom: 16,
+            marginTop: 15,
+          }}
+        >
           ← Volver
         </Text>
       </TouchableOpacity>
@@ -25,9 +32,8 @@ export default function ConfiguracionSoporte() {
 
       <OptionItem
         title="Cambiar contraseña"
-        subtitle="Este apartado será trabajado después"
-        onPress={() => {}}
-        disabled
+        subtitle="Actualiza la seguridad de tu cuenta"
+        onPress={() => router.push("/cambiarPassword")}
       />
 
       <OptionItem
