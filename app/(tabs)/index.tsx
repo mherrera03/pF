@@ -318,7 +318,18 @@ function HomeScreen() {
               </View>
             </View>
 
-            <TouchableOpacity style={styles.foundButton}>
+            <TouchableOpacity
+              style={styles.foundButton}
+              onPress={() =>
+                router.push({
+                  pathname: "/chatDetalle" as any,
+                  params: {
+                    name: item.nombre,
+                    avatar: item.fotoUrl ?? "https://i.pravatar.cc/150?img=32",
+                  },
+                })
+              }
+            >
               <Text style={styles.foundButtonText}>Reportar hallazgo</Text>
             </TouchableOpacity>
           </TouchableOpacity>

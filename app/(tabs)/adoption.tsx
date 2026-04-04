@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
   FlatList,
@@ -19,8 +20,8 @@ interface AdoptionPet {
   age: string;
   gender: string;
   personality: string;
-  tipo: PetType; 
-  tamaño: PetSize; 
+  tipo: PetType;
+  tamaño: PetSize;
 }
 
 const adoptionPetsList: AdoptionPet[] = [
@@ -30,17 +31,17 @@ const adoptionPetsList: AdoptionPet[] = [
 ];
 
 export default function AdoptionScreen() {
+  const router = useRouter();
   const [menuVisible, setMenuVisible] = useState(false);
   const [mascotas, setMascotas] = useState(adoptionPetsList);
   const [filtrosActivos, setFiltrosActivos] = useState<string[]>([]);
 
- 
   const aplicarFiltro = (tipoFiltro: string, valor: string) => {
     const filtro = `${tipoFiltro}:${valor}`;
     let nuevosFiltros;
 
     if (filtrosActivos.includes(filtro)) {
-      nuevosFiltros = filtrosActivos.filter(f => f !== filtro);
+      nuevosFiltros = filtrosActivos.filter((f) => f !== filtro);
     } else {
       nuevosFiltros = [...filtrosActivos, filtro];
     }
@@ -48,14 +49,18 @@ export default function AdoptionScreen() {
     setFiltrosActivos(nuevosFiltros);
 
     let filtrados = adoptionPetsList;
-    const especies = nuevosFiltros.filter(f => f.startsWith('especie')).map(f => f.split(':')[1]);
-    const tamaños = nuevosFiltros.filter(f => f.startsWith('tamaño')).map(f => f.split(':')[1]);
+    const especies = nuevosFiltros
+      .filter((f) => f.startsWith("especie"))
+      .map((f) => f.split(":")[1]);
+    const tamaños = nuevosFiltros
+      .filter((f) => f.startsWith("tamaño"))
+      .map((f) => f.split(":")[1]);
 
     if (especies.length > 0) {
-      filtrados = filtrados.filter(m => especies.includes(m.tipo));
+      filtrados = filtrados.filter((m) => especies.includes(m.tipo));
     }
     if (tamaños.length > 0) {
-      filtrados = filtrados.filter(m => tamaños.includes(m.tamaño));
+      filtrados = filtrados.filter((m) => tamaños.includes(m.tamaño));
     }
 
     setMascotas(filtrados);
@@ -69,12 +74,12 @@ export default function AdoptionScreen() {
 
   const getMenuItemStyle = (tipo: string, valor: string) => ([
     styles.menuItem,
-    filtrosActivos.includes(`${tipo}:${valor}`) && styles.menuItemActive
+    filtrosActivos.includes(`${tipo}:${valor}`) && styles.menuItemActive,
   ]);
 
   const getMenuTextStyle = (tipo: string, valor: string) => ([
     styles.menuText,
-    filtrosActivos.includes(`${tipo}:${valor}`) && styles.menuTextActive
+    filtrosActivos.includes(`${tipo}:${valor}`) && styles.menuTextActive,
   ]);
 
   return (
@@ -90,34 +95,49 @@ export default function AdoptionScreen() {
             <View style={[styles.androidMenu, { top: 160, right: 20 }]}>
               <Text style={styles.menuHeader}>Especie</Text>
 
-              <TouchableOpacity style={getMenuItemStyle('especie', 'Perro')} onPress={() => aplicarFiltro('especie', 'Perro')}>
-                <Text style={getMenuTextStyle('especie', 'Perro')}>Perros</Text>
+              <TouchableOpacity
+                style={getMenuItemStyle("especie", "Perro")}
+                onPress={() => aplicarFiltro("especie", "Perro")}
+              >
+                <Text style={getMenuTextStyle("especie", "Perro")}>Perros</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={getMenuItemStyle('especie', 'Gato')} onPress={() => aplicarFiltro('especie', 'Gato')}>
-                <Text style={getMenuTextStyle('especie', 'Gato')}>Gatos</Text>
+              <TouchableOpacity
+                style={getMenuItemStyle("especie", "Gato")}
+                onPress={() => aplicarFiltro("especie", "Gato")}
+              >
+                <Text style={getMenuTextStyle("especie", "Gato")}>Gatos</Text>
               </TouchableOpacity>
 
               <View style={styles.divider} />
 
               <Text style={styles.menuHeader}>Tamaño</Text>
 
-              <TouchableOpacity style={getMenuItemStyle('tamaño', 'Pequeño')} onPress={() => aplicarFiltro('tamaño', 'Pequeño')}>
-                <Text style={getMenuTextStyle('tamaño', 'Pequeño')}>Pequeño</Text>
+              <TouchableOpacity
+                style={getMenuItemStyle("tamaño", "Pequeño")}
+                onPress={() => aplicarFiltro("tamaño", "Pequeño")}
+              >
+                <Text style={getMenuTextStyle("tamaño", "Pequeño")}>Pequeño</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={getMenuItemStyle('tamaño', 'Mediano')} onPress={() => aplicarFiltro('tamaño', 'Mediano')}>
-                <Text style={getMenuTextStyle('tamaño', 'Mediano')}>Mediano</Text>
+              <TouchableOpacity
+                style={getMenuItemStyle("tamaño", "Mediano")}
+                onPress={() => aplicarFiltro("tamaño", "Mediano")}
+              >
+                <Text style={getMenuTextStyle("tamaño", "Mediano")}>Mediano</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={getMenuItemStyle('tamaño', 'Grande')} onPress={() => aplicarFiltro('tamaño', 'Grande')}>
-                <Text style={getMenuTextStyle('tamaño', 'Grande')}>Grande</Text>
+              <TouchableOpacity
+                style={getMenuItemStyle("tamaño", "Grande")}
+                onPress={() => aplicarFiltro("tamaño", "Grande")}
+              >
+                <Text style={getMenuTextStyle("tamaño", "Grande")}>Grande</Text>
               </TouchableOpacity>
 
               <View style={styles.divider} />
 
               <TouchableOpacity style={styles.menuItem} onPress={limpiarFiltros}>
-                <Text style={[styles.menuText, {color: '#7B61FF', fontWeight: 'bold'}]}>
+                <Text style={[styles.menuText, { color: "#7B61FF", fontWeight: "bold" }]}>
                   Limpiar filtros
                 </Text>
               </TouchableOpacity>
@@ -132,8 +152,12 @@ export default function AdoptionScreen() {
         ListHeaderComponent={
           <>
             <AdoptionHeader />
+
             <View style={styles.topRow}>
-              <TouchableOpacity style={styles.adoptButton}>
+              <TouchableOpacity
+                style={styles.adoptButton}
+                onPress={() => router.push("/darAdop")}
+              >
                 <MaterialIcons name="add" size={20} color="white" />
                 <Text style={styles.adoptButtonText}>Dar en adopción</Text>
               </TouchableOpacity>
@@ -164,6 +188,8 @@ function AdoptionHeader() {
 }
 
 function AdoptionPetCard({ pet }: { pet: AdoptionPet }) {
+  const router = useRouter();
+
   return (
     <View style={styles.card}>
       <View style={styles.cardRow}>
@@ -173,11 +199,27 @@ function AdoptionPetCard({ pet }: { pet: AdoptionPet }) {
         <View style={{ flex: 1 }}>
           <Text style={styles.petName}>{pet.name}</Text>
           <Text style={styles.petText}>Raza: {pet.breed}</Text>
-          <Text style={styles.petSub}>{pet.age} • {pet.gender}</Text>
+          <Text style={styles.petSub}>
+            {pet.age} • {pet.gender}
+          </Text>
           <Text style={styles.petPersonality}>{pet.personality}</Text>
         </View>
       </View>
-      <TouchableOpacity style={styles.wantButton}>
+
+      <TouchableOpacity
+        style={styles.wantButton}
+        onPress={() =>
+          router.push({
+            pathname: "/perfilInteres",
+            params: {
+              petName: pet.name,
+              petBreed: pet.breed,
+              petAge: pet.age,
+              petGender: pet.gender,
+            },
+          })
+        }
+      >
         <Text style={{ color: "white", fontWeight: "bold" }}>Quiero adoptar</Text>
       </TouchableOpacity>
     </View>
@@ -186,51 +228,76 @@ function AdoptionPetCard({ pet }: { pet: AdoptionPet }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F5F5F5" },
-  modalOverlay: { flex: 1, backgroundColor: 'transparent' },
+  modalOverlay: { flex: 1, backgroundColor: "transparent" },
   header: { alignItems: "center", marginTop: 24, marginBottom: 16 },
   headerTitle: { fontSize: 24, fontWeight: "800", color: "#5E35B1" },
   headerSubtitle: { color: "gray", fontSize: 14 },
   topRow: { flexDirection: "row", alignItems: "center", marginBottom: 16 },
   adoptButton: {
-    flex: 1, height: 45, backgroundColor: "#7B61FF", borderRadius: 12,
-    justifyContent: "center", alignItems: "center", flexDirection: "row", gap: 8,
+    flex: 1,
+    height: 45,
+    backgroundColor: "#7B61FF",
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
   },
   adoptButtonText: { color: "white", fontWeight: "bold" },
-  filterDots: { width: 40, alignItems: 'flex-end' },
+  filterDots: { width: 40, alignItems: "flex-end" },
   androidMenu: {
-    position: 'absolute',
-    backgroundColor: 'white',
+    position: "absolute",
+    backgroundColor: "white",
     borderRadius: 12,
     elevation: 10,
     paddingVertical: 10,
     width: 170,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOpacity: 0.1,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
-    zIndex: 1000
+    zIndex: 1000,
   },
-  menuHeader: { fontSize: 11, color: '#999', paddingHorizontal: 15, marginBottom: 5, fontWeight: 'bold' },
+  menuHeader: {
+    fontSize: 11,
+    color: "#999",
+    paddingHorizontal: 15,
+    marginBottom: 5,
+    fontWeight: "bold",
+  },
   menuItem: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 8 },
-  menuItemActive: { backgroundColor: '#EFE9FF' },
+  menuItemActive: { backgroundColor: "#EFE9FF" },
   menuText: { fontSize: 15 },
-  menuTextActive: { color: '#7B61FF', fontWeight: 'bold' },
-  divider: { height: 1, backgroundColor: '#eee', marginVertical: 5 },
+  menuTextActive: { color: "#7B61FF", fontWeight: "bold" },
+  divider: { height: 1, backgroundColor: "#eee", marginVertical: 5 },
   card: {
-    backgroundColor: "white", borderRadius: 16, borderWidth: 2,
-    borderColor: "#E1BEE7", padding: 12, marginBottom: 16,
+    backgroundColor: "white",
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: "#E1BEE7",
+    padding: 12,
+    marginBottom: 16,
   },
   cardRow: { flexDirection: "row" },
   petImage: {
-    width: 100, height: 100, borderRadius: 12, backgroundColor: "#F3E5F5",
-    justifyContent: "center", alignItems: "center", marginRight: 12,
+    width: 100,
+    height: 100,
+    borderRadius: 12,
+    backgroundColor: "#F3E5F5",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
   },
   petName: { fontWeight: "bold", fontSize: 20, color: "#9575CD" },
   petText: { fontSize: 13 },
   petSub: { fontSize: 13, color: "gray" },
   petPersonality: { fontSize: 12, color: "#444" },
   wantButton: {
-    marginTop: 12, height: 42, backgroundColor: "#9575CD",
-    borderRadius: 25, justifyContent: "center", alignItems: "center",
+    marginTop: 12,
+    height: 42,
+    backgroundColor: "#9575CD",
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });

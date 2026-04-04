@@ -235,6 +235,8 @@ export default function ReporteScreen() {
     "Shih Tzu",
     "Beagle",
     "Rottweiler",
+    "Mezclado",
+    "Aguacaterri",
     "Otro",
   ];
 
@@ -247,7 +249,8 @@ export default function ReporteScreen() {
     "Azul Ruso",
     "British Shorthair",
     "Sphynx",
-    "Otro",
+    "Mezclado",
+    "Otro"
   ];
 
   const razasSegunEspecie =
