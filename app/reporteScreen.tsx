@@ -260,6 +260,11 @@ export default function ReporteScreen() {
           ? formData.razaOtro.trim()
           : formData.raza.trim();
 
+      const nombreReportante =
+        user?.displayName?.trim() ||
+        user?.email?.split("@")[0] ||
+        "Usuario";
+
       await addDoc(collection(db, "reportes"), {
         nombre: formData.nombre.trim(),
         tipo: formData.especie,
@@ -290,6 +295,9 @@ export default function ReporteScreen() {
 
         createdAt: serverTimestamp(),
         ownerUid: uid,
+
+        nombreReportante,
+        emailReportante: user?.email ?? null,
       });
 
       Alert.alert("Reporte enviado", "Tu reporte fue publicado correctamente 🐾");

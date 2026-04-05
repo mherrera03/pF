@@ -29,6 +29,7 @@ type ReporteMascota = {
   fecha: string;
   rasgos: string;
   ubicacion: string;
+  nombreReportante: string;
 };
 
 function HomeScreen() {
@@ -76,6 +77,7 @@ function HomeScreen() {
                 ? [data.fotoUrl]
                 : [],
               fotoUrl: data.fotoUrl ?? null,
+              nombreReportante: data.nombreReportante ?? "Usuario",
             };
           });
 
@@ -308,6 +310,9 @@ function HomeScreen() {
 
               <View style={styles.infoContainer}>
                 <Text style={styles.petName}>{item.nombre}</Text>
+                <Text style={styles.reporterText}>
+                  Reportado por: {item.nombreReportante}
+                </Text>
                 <Text style={styles.petDetails}>Raza: {item.raza}</Text>
                 <Text style={styles.petDetails}>Fecha: {item.fecha}</Text>
                 <Text style={styles.petDetails}>
@@ -342,6 +347,13 @@ function HomeScreen() {
 export default HomeScreen;
 
 const styles = StyleSheet.create({
+  reporterText: {
+  fontSize: 12,
+  color: "#7B61FF",
+  fontWeight: "600",
+  marginTop: 2,
+  marginBottom: 4,
+},
   container: {
     flex: 1,
     backgroundColor: "#F6F2FF",
