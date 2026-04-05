@@ -1,11 +1,5 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import {
-  addDoc,
-  collection,
-  doc,
-  getDoc,
-  serverTimestamp,
-} from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
 import {
   Dimensions,
@@ -19,9 +13,10 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { db } from "../config/firebase";
-
 import MapView, { Marker } from "react-native-maps";
+
+import { auth, db } from "../config/firebase";
+import { crearOObtenerChat } from "../services/chatService";
 
 const { width } = Dimensions.get("window");
 const CAROUSEL_WIDTH = width - 40;
@@ -34,25 +29,31 @@ export default function DetalleReporte() {
 
   useEffect(() => {
     const cargar = async () => {
-      const ref = doc(db, "reportes", id as string);
-      const snap = await getDoc(ref);
+      try {
+        const ref = doc(db, "reportes", id as string);
+        const snap = await getDoc(ref);
 
-      if (snap.exists()) {
-        const data = snap.data();
+        if (snap.exists()) {
+          const data = snap.data();
 
-        setReporte({
-          id: snap.id,
-          ...data,
-          fotosUrls: Array.isArray(data.fotosUrls)
-            ? data.fotosUrls.slice(0, 5)
-            : data.fotoUrl
-            ? [data.fotoUrl]
-            : [],
-        });
+          setReporte({
+            id: snap.id,
+            ...data,
+            fotosUrls: Array.isArray(data.fotosUrls)
+              ? data.fotosUrls.slice(0, 5)
+              : data.fotoUrl
+              ? [data.fotoUrl]
+              : [],
+          });
+        }
+      } catch (error) {
+        console.log("Error cargando reporte:", error);
       }
     };
 
-    cargar();
+    if (id) {
+      cargar();
+    }
   }, [id]);
 
   const fotos = useMemo(() => {
@@ -90,7 +91,7 @@ export default function DetalleReporte() {
           `Color: ${reporte?.color || "No especificado"}\n` +
           `Fecha: ${reporte?.fecha || "No especificada"}\n` +
           `Teléfono: ${reporte?.telefono || "No disponible"}\n` +
-          `Rasgos: ${reporte?.rasgos || "Sin detalles"}`
+          `Rasgos: ${reporte?.rasgos || "Sin detalles"}`,
       });
     } catch (error) {
       console.log("Error al compartir:", error);
@@ -99,24 +100,40 @@ export default function DetalleReporte() {
 
   const reportarHallazgo = async () => {
     try {
-      await addDoc(collection(db, "hallazgos"), {
-        reporteId: id,
-        nombreMascota: reporte?.nombre || null,
-        telefonoContacto: reporte?.telefono || null,
-        createdAt: serverTimestamp(),
+      const user = auth.currentUser;
+
+      if (!user) {
+        alert("Debes iniciar sesión");
+        return;
+      }
+
+      if (!reporte?.ownerUid) {
+        alert("Este reporte no tiene dueño asociado");
+        return;
+      }
+
+      if (user.uid === reporte.ownerUid) {
+        alert("No puedes crear un chat contigo misma");
+        return;
+      }
+
+      const chatId = await crearOObtenerChat({
+        reportId: reporte.id,
+        ownerUid: reporte.ownerUid,
+        ownerName: reporte.ownerName || reporte.nombreReportante || "Usuario",
+        ownerPhoto: reporte.ownerPhoto || "",
+        currentUserName: user.displayName || "Usuario",
+        currentUserPhoto: user.photoURL || "",
+        petName: reporte.nombre,
       });
 
-      await addDoc(collection(db, "notificaciones"), {
-        tipo: "hallazgo",
-        reporteId: id,
-        mensaje: `Alguien reportó haber encontrado a ${reporte?.nombre || "tu mascota"}`,
-        createdAt: serverTimestamp(),
-        leido: false,
+      router.push({
+        pathname: "/chatDetalle" as any,
+        params: { chatId },
       });
-
-      alert("Se notificó al dueño de la mascota 🐾");
-    } catch (error) {
-      console.log("Error reportando hallazgo:", error);
+    } catch (error: any) {
+      console.log("Error creando/abriendo chat:", error);
+      alert(error?.message || "No se pudo abrir el chat");
     }
   };
 
@@ -396,23 +413,23 @@ const styles = StyleSheet.create({
   },
 
   actionButtonText: {
-    color: "#FFFFFF",
+    color: "#fff",
     fontWeight: "bold",
-    fontSize: 15,
+    fontSize: 14,
   },
 
   foundButton: {
-    backgroundColor: "#ab1d85",
-    paddingVertical: 16,
+    backgroundColor: "#9F8CFF",
+    paddingVertical: 15,
     borderRadius: 20,
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 18,
   },
 
   foundButtonText: {
-    color: "white",
+    color: "#fff",
     fontWeight: "bold",
-    fontSize: 16,
+    fontSize: 15,
   },
 
   card: {
@@ -428,50 +445,47 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     color: "#5E35B1",
-    marginBottom: 14,
+    marginBottom: 12,
   },
 
   row: {
-    marginBottom: 10,
+    flexDirection: "row",
+    marginBottom: 8,
   },
 
   label: {
-    fontSize: 14,
+    width: 90,
     fontWeight: "700",
-    color: "#7A68B3",
-    marginBottom: 2,
+    color: "#6B5AA6",
   },
 
   value: {
-    fontSize: 16,
+    flex: 1,
     color: "#444",
-    lineHeight: 22,
   },
 
   description: {
-    fontSize: 16,
     color: "#444",
-    lineHeight: 24,
+    lineHeight: 22,
   },
 
   map: {
     width: "100%",
     height: 220,
     borderRadius: 18,
-    marginTop: 4,
+    marginTop: 6,
+    marginBottom: 12,
   },
 
   mapButton: {
-    marginTop: 14,
-    backgroundColor: "#7B61FF",
-    paddingVertical: 14,
-    borderRadius: 18,
+    backgroundColor: "#5E35B1",
+    paddingVertical: 12,
+    borderRadius: 16,
     alignItems: "center",
   },
 
   mapButtonText: {
-    color: "#FFFFFF",
+    color: "#fff",
     fontWeight: "bold",
-    fontSize: 15,
   },
 });

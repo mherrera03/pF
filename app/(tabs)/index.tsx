@@ -17,6 +17,7 @@ import {
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { auth, db } from "../../config/firebase";
+import { crearOObtenerChat } from "../../services/chatService";
 
 type ReporteMascota = {
   fotosUrls?: string[];
@@ -30,6 +31,9 @@ type ReporteMascota = {
   rasgos: string;
   ubicacion: string;
   nombreReportante: string;
+  ownerUid: string;
+  ownerName: string;
+  ownerPhoto?: string | null;
 };
 
 function HomeScreen() {
@@ -40,6 +44,45 @@ function HomeScreen() {
   const [mascotas, setMascotas] = useState<ReporteMascota[]>([]);
   const [filtrosActivos, setFiltrosActivos] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const handleReportarHallazgo = async (item: ReporteMascota) => {
+    try {
+      const user = auth.currentUser;
+
+      if (!user) {
+        alert("Debes iniciar sesión");
+        return;
+      }
+
+      if (!item.ownerUid) {
+        alert("Este reporte no tiene dueño asociado");
+        return;
+      }
+
+      if (user.uid === item.ownerUid) {
+        alert("No puedes crear un chat contigo misma");
+        return;
+      }
+
+      const chatId = await crearOObtenerChat({
+        reportId: item.id,
+        ownerUid: item.ownerUid,
+        ownerName: item.ownerName || item.nombreReportante || "Usuario",
+        ownerPhoto: item.ownerPhoto || "",
+        currentUserName: user.displayName || "Usuario",
+        currentUserPhoto: user.photoURL || "",
+        petName: item.nombre,
+      });
+
+      router.push({
+        pathname: "/chatDetalle" as any,
+        params: { chatId },
+      });
+    } catch (error: any) {
+      console.log("Error creando/abriendo chat:", error);
+      alert(error?.message || "No se pudo abrir el chat");
+    }
+  };
 
   useEffect(() => {
     let unsubReportes: (() => void) | null = null;
@@ -78,6 +121,9 @@ function HomeScreen() {
                 : [],
               fotoUrl: data.fotoUrl ?? null,
               nombreReportante: data.nombreReportante ?? "Usuario",
+              ownerUid: data.ownerUid ?? "",
+              ownerName: data.ownerName ?? data.nombreReportante ?? "Usuario",
+              ownerPhoto: data.ownerPhoto ?? data.fotoUrl ?? null,
             };
           });
 
@@ -325,15 +371,7 @@ function HomeScreen() {
 
             <TouchableOpacity
               style={styles.foundButton}
-              onPress={() =>
-                router.push({
-                  pathname: "/chatDetalle" as any,
-                  params: {
-                    name: item.nombre,
-                    avatar: item.fotoUrl ?? "https://i.pravatar.cc/150?img=32",
-                  },
-                })
-              }
+              onPress={() => handleReportarHallazgo(item)}
             >
               <Text style={styles.foundButtonText}>Reportar hallazgo</Text>
             </TouchableOpacity>
@@ -348,12 +386,12 @@ export default HomeScreen;
 
 const styles = StyleSheet.create({
   reporterText: {
-  fontSize: 12,
-  color: "#7B61FF",
-  fontWeight: "600",
-  marginTop: 2,
-  marginBottom: 4,
-},
+    fontSize: 12,
+    color: "#7B61FF",
+    fontWeight: "600",
+    marginTop: 2,
+    marginBottom: 4,
+  },
   container: {
     flex: 1,
     backgroundColor: "#F6F2FF",

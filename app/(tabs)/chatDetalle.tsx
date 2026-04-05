@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   FlatList,
   Image,
@@ -12,6 +12,9 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { collection, onSnapshot, orderBy, query, where } from "firebase/firestore";
+import { auth, db } from "../../config/firebase";
+
 type ChatItem = {
   id: string;
   userName: string;
@@ -22,58 +25,102 @@ type ChatItem = {
   isOnline: boolean;
 };
 
-const CHATS_INICIALES: ChatItem[] = [
-  {
-    id: "1",
-    userName: "María López",
-    userAvatar: "https://i.pravatar.cc/150?img=32",
-    lastMessage: "Hola, gracias por avisarme. ¿Dónde la viste exactamente?",
-    time: "10:24 a.m.",
-    unreadCount: 2,
-    isOnline: true,
-  },
-  {
-    id: "2",
-    userName: "Carlos Ramírez",
-    userAvatar: "https://i.pravatar.cc/150?img=12",
-    lastMessage: "Sí, creo que era cerca del parque central.",
-    time: "9:10 a.m.",
-    unreadCount: 0,
-    isOnline: false,
-  },
-  {
-    id: "3",
-    userName: "Andrea Flores",
-    userAvatar: "https://i.pravatar.cc/150?img=47",
-    lastMessage: "Muchas gracias por compartir la publicación 💜",
-    time: "Ayer",
-    unreadCount: 1,
-    isOnline: true,
-  },
-  {
-    id: "4",
-    userName: "Refugio San Miguel",
-    userAvatar: "https://i.pravatar.cc/150?img=5",
-    lastMessage: "Podemos ayudar a difundir el caso en nuestras redes.",
-    time: "Ayer",
-    unreadCount: 0,
-    isOnline: false,
-  },
-  {
-    id: "5",
-    userName: "Alcaldía Municipal",
-    userAvatar: "https://i.pravatar.cc/150?img=15",
-    lastMessage: "Recibimos el reporte, estaremos atentos.",
-    time: "Lun",
-    unreadCount: 3,
-    isOnline: false,
-  },
-];
+function formatearFechaChat(fecha: any) {
+  if (!fecha) return "";
+
+  const date =
+    typeof fecha?.toDate === "function" ? fecha.toDate() : new Date(fecha);
+
+  if (Number.isNaN(date.getTime())) return "";
+
+  const ahora = new Date();
+
+  const mismoDia =
+    date.getDate() === ahora.getDate() &&
+    date.getMonth() === ahora.getMonth() &&
+    date.getFullYear() === ahora.getFullYear();
+
+  if (mismoDia) {
+    return date.toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+
+  const ayer = new Date();
+  ayer.setDate(ahora.getDate() - 1);
+
+  const esAyer =
+    date.getDate() === ayer.getDate() &&
+    date.getMonth() === ayer.getMonth() &&
+    date.getFullYear() === ayer.getFullYear();
+
+  if (esAyer) return "Ayer";
+
+  return date.toLocaleDateString([], {
+    day: "2-digit",
+    month: "2-digit",
+  });
+}
 
 export default function ChatDetalle() {
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState("");
-  const [chats] = useState<ChatItem[]>(CHATS_INICIALES);
+  const [chats, setChats] = useState<ChatItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const user = auth.currentUser;
+
+    if (!user) {
+      setChats([]);
+      setLoading(false);
+      return;
+    }
+
+    const q = query(
+      collection(db, "chats"),
+      where("participantes", "array-contains", user.uid),
+      orderBy("actualizadoEn", "desc")
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const lista: ChatItem[] = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data() as any;
+
+          const otroUid =
+            Array.isArray(data.participantes)
+              ? data.participantes.find((uid: string) => uid !== user.uid)
+              : null;
+
+          const otroUsuario =
+            (otroUid && data.participantesInfo?.[otroUid]) || {};
+
+          return {
+            id: docSnap.id,
+            userName: otroUsuario.nombre || "Usuario",
+            userAvatar:
+              otroUsuario.foto || "https://i.pravatar.cc/150?img=32",
+            lastMessage: data.ultimoMensaje || "Sin mensajes",
+            time: formatearFechaChat(data.actualizadoEn),
+            unreadCount: data.unreadCount?.[user.uid] ?? 0,
+            isOnline: false,
+          };
+        });
+
+        setChats(lista);
+        setLoading(false);
+      },
+      (error) => {
+        console.log("Error cargando chats:", error);
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, []);
 
   const chatsFiltrados = useMemo(() => {
     const texto = search.trim().toLowerCase();
@@ -89,10 +136,9 @@ export default function ChatDetalle() {
 
   const abrirChat = (chat: ChatItem) => {
     router.push({
-      pathname: "/chatScreen",
+      pathname: "/chatScreen" as any,
       params: {
-        userName: chat.userName,
-        userAvatar: chat.userAvatar,
+        chatId: chat.id,
       },
     });
   };
@@ -228,7 +274,6 @@ export default function ChatDetalle() {
       edges={["top", "left", "right"]}
     >
       <View style={{ flex: 1 }}>
-        {/* Header */}
         <View
           style={{
             paddingHorizontal: 18,
@@ -257,7 +302,6 @@ export default function ChatDetalle() {
             Aquí aparecerán las conversaciones de tus reportes y avisos.
           </Text>
 
-          {/* Buscador */}
           <View
             style={{
               flexDirection: "row",
@@ -291,7 +335,6 @@ export default function ChatDetalle() {
           </View>
         </View>
 
-        {/* Lista */}
         <FlatList
           data={chatsFiltrados}
           keyExtractor={(item) => item.id}
@@ -339,7 +382,7 @@ export default function ChatDetalle() {
                   marginBottom: 8,
                 }}
               >
-                No hay chats todavía
+                {loading ? "Cargando chats..." : "No hay chats todavía"}
               </Text>
 
               <Text
@@ -350,39 +393,13 @@ export default function ChatDetalle() {
                   lineHeight: 21,
                 }}
               >
-                Cuando alguien responda un reporte o inicies una conversación,
-                aparecerá aquí.
+                {loading
+                  ? "Espera un momento."
+                  : "Cuando alguien responda un reporte o inicies una conversación, aparecerá aquí."}
               </Text>
             </View>
           }
         />
-
-        {/* Botón flotante opcional */}
-        <TouchableOpacity
-          activeOpacity={0.9}
-          style={{
-            position: "absolute",
-            right: 18,
-            bottom: 95 + Math.max(insets.bottom, 10),
-            width: 58,
-            height: 58,
-            borderRadius: 29,
-            backgroundColor: "#7E57C2",
-            justifyContent: "center",
-            alignItems: "center",
-            shadowColor: "#000",
-            shadowOpacity: 0.16,
-            shadowRadius: 10,
-            shadowOffset: { width: 0, height: 4 },
-            elevation: 5,
-          }}
-        >
-          <MaterialCommunityIcons
-            name="message-plus-outline"
-            size={26}
-            color="#FFFFFF"
-          />
-        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
