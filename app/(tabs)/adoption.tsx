@@ -1,8 +1,10 @@
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
+  Image,
   Modal,
   StyleSheet,
   Text,
@@ -10,35 +12,97 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import { collection, getDocs, orderBy, query } from "firebase/firestore";
+import { db } from "../../config/firebase";
 
-type PetType = "Perro" | "Gato";
+type PetType = "Perro" | "Gato" | "Ave" | "Otro";
 type PetSize = "Pequeño" | "Mediano" | "Grande";
 
 interface AdoptionPet {
-  name: string;
-  breed: string;
-  age: string;
-  gender: string;
-  personality: string;
+  id: string;
+  nombre: string;
+  raza: string;
+  edad: string;
+  sexo: string;
+  descripcion: string;
   tipo: PetType;
   tamaño: PetSize;
+  fotoUrl?: string | null;
+  ownerName?: string;
 }
-
-const adoptionPetsList: AdoptionPet[] = [
-  { name: "Buddy", breed: "Golden Retriever", age: "2 años", gender: "Macho", personality: "Juguetón", tipo: "Perro", tamaño: "Grande" },
-  { name: "Mía", breed: "Siamés", age: "6 meses", gender: "Hembra", personality: "Tranquila", tipo: "Gato", tamaño: "Pequeño" },
-  { name: "Thor", breed: "Mestizo", age: "4 años", gender: "Macho", personality: "Protector", tipo: "Perro", tamaño: "Mediano" },
-];
 
 export default function AdoptionScreen() {
   const router = useRouter();
   const [menuVisible, setMenuVisible] = useState(false);
-  const [mascotas, setMascotas] = useState(adoptionPetsList);
+  const [mascotas, setMascotas] = useState<AdoptionPet[]>([]);
+  const [todasLasMascotas, setTodasLasMascotas] = useState<AdoptionPet[]>([]);
   const [filtrosActivos, setFiltrosActivos] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const cargarAdopciones = async () => {
+    try {
+      setLoading(true);
+
+      const q = query(collection(db, "adopciones"), orderBy("createdAt", "desc"));
+      const snap = await getDocs(q);
+
+      const lista: AdoptionPet[] = snap.docs.map((doc) => {
+        const data = doc.data();
+
+        return {
+          id: doc.id,
+          nombre: data.nombre || "",
+          raza: data.raza || "",
+          edad: data.edad || "",
+          sexo: data.sexo || "",
+          descripcion: data.descripcion || "",
+          tipo: data.tipo || data.especie || "Otro",
+          tamaño: data.tamaño || "Mediano",
+          fotoUrl: data.fotoUrl || null,
+          ownerName: data.ownerName || "Usuario",
+        };
+      });
+
+      setTodasLasMascotas(lista);
+      setMascotas(lista);
+    } catch (error) {
+      console.log("Error cargando adopciones:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      cargarAdopciones();
+    }, [])
+  );
+
+  const aplicarFiltrosConLista = (listaBase: AdoptionPet[], filtros: string[]) => {
+    let filtrados = [...listaBase];
+
+    const especies = filtros
+      .filter((f) => f.startsWith("especie"))
+      .map((f) => f.split(":")[1]);
+
+    const tamaños = filtros
+      .filter((f) => f.startsWith("tamaño"))
+      .map((f) => f.split(":")[1]);
+
+    if (especies.length > 0) {
+      filtrados = filtrados.filter((m) => especies.includes(m.tipo));
+    }
+
+    if (tamaños.length > 0) {
+      filtrados = filtrados.filter((m) => tamaños.includes(m.tamaño));
+    }
+
+    setMascotas(filtrados);
+  };
 
   const aplicarFiltro = (tipoFiltro: string, valor: string) => {
     const filtro = `${tipoFiltro}:${valor}`;
-    let nuevosFiltros;
+    let nuevosFiltros: string[];
 
     if (filtrosActivos.includes(filtro)) {
       nuevosFiltros = filtrosActivos.filter((f) => f !== filtro);
@@ -47,46 +111,30 @@ export default function AdoptionScreen() {
     }
 
     setFiltrosActivos(nuevosFiltros);
-
-    let filtrados = adoptionPetsList;
-    const especies = nuevosFiltros
-      .filter((f) => f.startsWith("especie"))
-      .map((f) => f.split(":")[1]);
-    const tamaños = nuevosFiltros
-      .filter((f) => f.startsWith("tamaño"))
-      .map((f) => f.split(":")[1]);
-
-    if (especies.length > 0) {
-      filtrados = filtrados.filter((m) => especies.includes(m.tipo));
-    }
-    if (tamaños.length > 0) {
-      filtrados = filtrados.filter((m) => tamaños.includes(m.tamaño));
-    }
-
-    setMascotas(filtrados);
+    aplicarFiltrosConLista(todasLasMascotas, nuevosFiltros);
   };
 
   const limpiarFiltros = () => {
-    setMascotas(adoptionPetsList);
+    setMascotas(todasLasMascotas);
     setFiltrosActivos([]);
     setMenuVisible(false);
   };
 
-  const getMenuItemStyle = (tipo: string, valor: string) => ([
+  const getMenuItemStyle = (tipo: string, valor: string) => [
     styles.menuItem,
     filtrosActivos.includes(`${tipo}:${valor}`) && styles.menuItemActive,
-  ]);
+  ];
 
-  const getMenuTextStyle = (tipo: string, valor: string) => ([
+  const getMenuTextStyle = (tipo: string, valor: string) => [
     styles.menuText,
     filtrosActivos.includes(`${tipo}:${valor}`) && styles.menuTextActive,
-  ]);
+  ];
 
   return (
     <View style={styles.container}>
       <Modal
         visible={menuVisible}
-        transparent={true}
+        transparent
         animationType="fade"
         onRequestClose={() => setMenuVisible(false)}
       >
@@ -146,34 +194,46 @@ export default function AdoptionScreen() {
         </TouchableWithoutFeedback>
       </Modal>
 
-      <FlatList
-        data={mascotas}
-        keyExtractor={(item) => item.name}
-        ListHeaderComponent={
-          <>
-            <AdoptionHeader />
+      {loading ? (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#7B61FF" />
+          <Text style={{ marginTop: 10, color: "#666" }}>Cargando adopciones...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={mascotas}
+          keyExtractor={(item) => item.id}
+          ListHeaderComponent={
+            <>
+              <AdoptionHeader />
 
-            <View style={styles.topRow}>
-              <TouchableOpacity
-                style={styles.adoptButton}
-                onPress={() => router.push("/darAdop")}
-              >
-                <MaterialIcons name="add" size={20} color="white" />
-                <Text style={styles.adoptButtonText}>Dar en adopción</Text>
-              </TouchableOpacity>
+              <View style={styles.topRow}>
+                <TouchableOpacity
+                  style={styles.adoptButton}
+                  onPress={() => router.push("/darAdop")}
+                >
+                  <MaterialIcons name="add" size={20} color="white" />
+                  <Text style={styles.adoptButtonText}>Dar en adopción</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={() => setMenuVisible(true)}
-                style={styles.filterDots}
-              >
-                <MaterialCommunityIcons name="dots-vertical" size={28} color="#444" />
-              </TouchableOpacity>
-            </View>
-          </>
-        }
-        renderItem={({ item }) => <AdoptionPetCard pet={item} />}
-        contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
-      />
+                <TouchableOpacity
+                  onPress={() => setMenuVisible(true)}
+                  style={styles.filterDots}
+                >
+                  <MaterialCommunityIcons name="dots-vertical" size={28} color="#444" />
+                </TouchableOpacity>
+              </View>
+            </>
+          }
+          renderItem={({ item }) => <AdoptionPetCard pet={item} />}
+          ListEmptyComponent={
+            <Text style={{ textAlign: "center", marginTop: 30, color: "#777" }}>
+              No hay mascotas en adopción
+            </Text>
+          }
+          contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
+        />
+      )}
     </View>
   );
 }
@@ -193,16 +253,24 @@ function AdoptionPetCard({ pet }: { pet: AdoptionPet }) {
   return (
     <View style={styles.card}>
       <View style={styles.cardRow}>
-        <View style={styles.petImage}>
-          <MaterialIcons name="pets" size={40} color="#9575CD" />
-        </View>
+        {pet.fotoUrl ? (
+          <Image source={{ uri: pet.fotoUrl }} style={styles.petImageReal} />
+        ) : (
+          <View style={styles.petImage}>
+            <MaterialIcons name="pets" size={40} color="#9575CD" />
+          </View>
+        )}
+
         <View style={{ flex: 1 }}>
-          <Text style={styles.petName}>{pet.name}</Text>
-          <Text style={styles.petText}>Raza: {pet.breed}</Text>
+          <Text style={styles.ownerText}>Publicado por: {pet.ownerName || "Usuario"}</Text>
+          <Text style={styles.petName}>{pet.nombre}</Text>
+          <Text style={styles.petText}>Raza: {pet.raza}</Text>
           <Text style={styles.petSub}>
-            {pet.age} • {pet.gender}
+            {pet.edad} • {pet.sexo}
           </Text>
-          <Text style={styles.petPersonality}>{pet.personality}</Text>
+          <Text style={styles.petPersonality} numberOfLines={2}>
+            {pet.descripcion}
+          </Text>
         </View>
       </View>
 
@@ -212,10 +280,11 @@ function AdoptionPetCard({ pet }: { pet: AdoptionPet }) {
           router.push({
             pathname: "/perfilInteres",
             params: {
-              petName: pet.name,
-              petBreed: pet.breed,
-              petAge: pet.age,
-              petGender: pet.gender,
+              petId: pet.id,
+              petName: pet.nombre,
+              petBreed: pet.raza,
+              petAge: pet.edad,
+              petGender: pet.sexo,
             },
           })
         }
@@ -288,6 +357,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginRight: 12,
   },
+  petImageReal: {
+    width: 100,
+    height: 100,
+    borderRadius: 12,
+    marginRight: 12,
+  },
   petName: { fontWeight: "bold", fontSize: 20, color: "#9575CD" },
   petText: { fontSize: 13 },
   petSub: { fontSize: 13, color: "gray" },
@@ -299,5 +374,15 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     justifyContent: "center",
     alignItems: "center",
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  ownerText: {
+  fontSize: 12,
+  color: "#666",
+  marginTop: 4,
   },
 });

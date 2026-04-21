@@ -1,3 +1,5 @@
+import {addDoc,collection,serverTimestamp,doc,getDoc,} from "firebase/firestore";
+import * as FileSystem from "expo-file-system/legacy";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
@@ -16,12 +18,16 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { auth, db } from "../config/firebase";
+import { uploadToImageKitFromBase64 } from "../services/imageUpload";
 
 export default function DarAdopScreen() {
   const router = useRouter();
   const [pasoActual, setPasoActual] = useState<1 | 2>(1);
   const [image, setImage] = useState<string | null>(null);
+  const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [guardando, setGuardando] = useState(false);
 
   const [formData, setFormData] = useState({
     nombre: "",
@@ -63,14 +69,21 @@ export default function DarAdopScreen() {
     }
 
     const resultado = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ["images"],
       quality: 0.8,
       allowsEditing: true,
       aspect: [4, 4],
+      base64: true,
     });
 
     if (!resultado.canceled) {
-      setImage(resultado.assets[0].uri);
+      const asset = resultado.assets[0];
+
+      setImage(asset.uri);
+      setImageBase64(asset.base64 ?? null);
+
+      console.log("Imagen seleccionada:", asset.uri);
+      console.log("Base64 disponible:", !!asset.base64);
     }
   };
 
@@ -174,13 +187,93 @@ export default function DarAdopScreen() {
     }
   };
 
-  const guardarPlantilla = () => {
+  const publicarAdopcion = async () => {
     if (!validarPaso2()) return;
 
-    Alert.alert(
-      "Plantilla lista 🐾",
-      "Por ahora solo quedó la plantilla visual del formulario de dar en adopción."
-    );
+    try {
+      setGuardando(true);
+
+      let fotoUrl: string | null = null;
+
+      console.log("Iniciando publicación...");
+      console.log("Imagen seleccionada:", image);
+
+      if (image && !imageBase64) {
+        Alert.alert("Error", "No se pudo preparar la imagen para subir.");
+        return;
+      }
+
+      if (imageBase64) {
+        console.log("Subiendo imagen desde base64...");
+        fotoUrl = await uploadToImageKitFromBase64(imageBase64);
+      }
+
+      const uid = auth.currentUser?.uid;
+
+      if (!uid) {
+        Alert.alert("Error", "Debes iniciar sesión para publicar.");
+        return;
+      }
+
+      let ownerName = "Usuario";
+
+      const userRef = doc(db, "users", uid);
+      const userSnap = await getDoc(userRef);
+
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        ownerName = userData.nombre || userData.name || userData.username || "Usuario";
+      }
+
+      await addDoc(collection(db, "adopciones"), {
+        ownerUid: uid,
+        ownerName,
+
+        nombre: formData.nombre.trim(),
+        tipo: formData.especie.trim(),
+        especie: formData.especie.trim(),
+
+        raza:
+          formData.raza === "Otro"
+            ? formData.otraRaza.trim()
+            : formData.raza.trim(),
+
+        edad: formData.edad.trim(),
+        tamaño: formData.tamaño.trim(),
+        sexo: formData.sexo.trim(),
+        color: formData.color.trim(),
+        salud: formData.salud.trim(),
+        energia: formData.energia.trim(),
+        descripcion: formData.descripcion.trim(),
+
+        contactoNombre: formData.contactoNombre.trim(),
+        telefono: formData.telefono.trim(),
+        ubicacion: formData.ubicacion.trim(),
+        coords: coords || null,
+
+        vacunado: formData.vacunado.trim(),
+        esterilizado: formData.esterilizado.trim(),
+        convivePerros: formData.convivePerros.trim(),
+        conviveGatos: formData.conviveGatos.trim(),
+        conviveNinos: formData.conviveNinos.trim(),
+        tipoHogar: formData.tipoHogar.trim(),
+        requisitos: formData.requisitos.trim(),
+        seguimiento: formData.seguimiento.trim(),
+        notas: formData.notas.trim(),
+
+        fotoUrl,
+        estado: "disponible",
+        createdAt: serverTimestamp(),
+      });
+
+      Alert.alert("Éxito", "La mascota fue publicada en adopción.");
+      router.back();
+    } catch (error) {
+      console.log("Error completo al publicar adopción:", error);
+      Alert.alert("Error", "No se pudo publicar la adopción.");
+    } finally {
+      setGuardando(false);
+    }
   };
 
   const renderOpcion = (
@@ -340,7 +433,7 @@ export default function DarAdopScreen() {
             <Text style={styles.label}>Edad</Text>
             <TextInput
               style={styles.input}
-              placeholder="Ej. 8 meses / 2 años"
+              placeholder="Ej. 2 años"
               placeholderTextColor="#9A8FB5"
               value={formData.edad}
               onChangeText={(text) => actualizarCampo("edad", text)}
@@ -359,55 +452,48 @@ export default function DarAdopScreen() {
             <Text style={styles.label}>Color</Text>
             <TextInput
               style={styles.input}
-              placeholder="Ej. Café con blanco"
+              placeholder="Ej. Café claro"
               placeholderTextColor="#9A8FB5"
               value={formData.color}
               onChangeText={(text) => actualizarCampo("color", text)}
             />
 
             <Text style={styles.label}>Estado de salud</Text>
-            {renderOpcion("salud", formData.salud, [
-              "Bueno",
-              "Regular",
-              "Requiere cuidados",
-            ])}
+            <TextInput
+              style={styles.input}
+              placeholder="Ej. Bueno, en tratamiento, etc."
+              placeholderTextColor="#9A8FB5"
+              value={formData.salud}
+              onChangeText={(text) => actualizarCampo("salud", text)}
+            />
 
             <Text style={styles.label}>Nivel de energía</Text>
             {renderOpcion("energia", formData.energia, [
-              "Bajo",
-              "Medio",
-              "Alto",
+              "Baja",
+              "Media",
+              "Alta",
             ])}
 
-            <Text style={styles.label}>Descripción de la mascota</Text>
+            <Text style={styles.label}>Descripción</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
-              placeholder="Describe su personalidad, comportamiento, si es cariñoso, juguetón, tranquilo, etc."
+              placeholder="Describe la personalidad y situación de la mascota"
               placeholderTextColor="#9A8FB5"
               multiline
               value={formData.descripcion}
               onChangeText={(text) => actualizarCampo("descripcion", text)}
             />
+
+            <TouchableOpacity style={styles.primaryButton} onPress={siguientePaso}>
+              <Text style={styles.primaryButtonText}>Continuar</Text>
+            </TouchableOpacity>
           </>
         ) : (
           <>
-            <View style={styles.noticeBox}>
-              <MaterialCommunityIcons
-                name="information-outline"
-                size={22}
-                color="#6A5ACD"
-              />
-              <Text style={styles.noticeText}>
-                Esta parte ayuda a preparar el flujo de adopción en 2 fases:
-                primero una solicitud inicial y luego una validación más
-                detallada.
-              </Text>
-            </View>
-
-            <Text style={styles.label}>Nombre del contacto</Text>
+            <Text style={styles.label}>Nombre de contacto</Text>
             <TextInput
               style={styles.input}
-              placeholder="Ej. María López"
+              placeholder="Ej. Juan"
               placeholderTextColor="#9A8FB5"
               value={formData.contactoNombre}
               onChangeText={(text) => actualizarCampo("contactoNombre", text)}
@@ -424,66 +510,43 @@ export default function DarAdopScreen() {
             />
 
             <Text style={styles.label}>Ubicación</Text>
-            <TouchableOpacity style={styles.locationButton} onPress={obtenerUbicacion}>
-              <MaterialCommunityIcons
-                name="crosshairs-gps"
-                size={20}
-                color="#4C1D95"
-              />
-              <Text style={styles.locationButtonText}>Tomar mi ubicación actual</Text>
-            </TouchableOpacity>
-
             <TextInput
-              style={[styles.input, { marginTop: 12 }]}
-              placeholder="La dirección aparecerá aquí"
+              style={styles.input}
+              placeholder="Ubicación de entrega"
               placeholderTextColor="#9A8FB5"
               value={formData.ubicacion}
               onChangeText={(text) => actualizarCampo("ubicacion", text)}
             />
 
-            {!!formData.ubicacion && (
-              <View style={styles.locationBox}>
-                <Text style={styles.locationText}>{formData.ubicacion}</Text>
+            <TouchableOpacity style={styles.secondaryButton} onPress={obtenerUbicacion}>
+              <Text style={styles.secondaryButtonText}>Usar mi ubicación actual</Text>
+            </TouchableOpacity>
 
-                {coords && (
-                  <TouchableOpacity onPress={abrirMapa}>
-                    <Text style={styles.mapLink}>Ver en Google Maps</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
+            {coords && (
+              <TouchableOpacity style={styles.mapButton} onPress={abrirMapa}>
+                <Text style={styles.mapButtonText}>Ver ubicación en mapa</Text>
+              </TouchableOpacity>
             )}
 
-            <Text style={styles.label}>¿Está vacunado?</Text>
-            {renderOpcion("vacunado", formData.vacunado, ["Sí", "No", "Parcial"])}
+            <Text style={styles.label}>¿Vacunado?</Text>
+            {renderOpcion("vacunado", formData.vacunado, ["Sí", "No", "No sé"])}
 
-            <Text style={styles.label}>¿Está esterilizado?</Text>
-            {renderOpcion("esterilizado", formData.esterilizado, ["Sí", "No"])}
+            <Text style={styles.label}>¿Esterilizado?</Text>
+            {renderOpcion("esterilizado", formData.esterilizado, ["Sí", "No", "No sé"])}
 
             <Text style={styles.label}>¿Convive con perros?</Text>
-            {renderOpcion("convivePerros", formData.convivePerros, [
-              "Sí",
-              "No",
-              "No se sabe",
-            ])}
+            {renderOpcion("convivePerros", formData.convivePerros, ["Sí", "No", "No sé"])}
 
             <Text style={styles.label}>¿Convive con gatos?</Text>
-            {renderOpcion("conviveGatos", formData.conviveGatos, [
-              "Sí",
-              "No",
-              "No se sabe",
-            ])}
+            {renderOpcion("conviveGatos", formData.conviveGatos, ["Sí", "No", "No sé"])}
 
             <Text style={styles.label}>¿Convive con niños?</Text>
-            {renderOpcion("conviveNinos", formData.conviveNinos, [
-              "Sí",
-              "No",
-              "No se sabe",
-            ])}
+            {renderOpcion("conviveNinos", formData.conviveNinos, ["Sí", "No", "No sé"])}
 
             <Text style={styles.label}>Tipo de hogar ideal</Text>
             <TextInput
               style={styles.input}
-              placeholder="Ej. Casa con patio, apartamento tranquilo, familia con experiencia..."
+              placeholder="Ej. Casa con patio"
               placeholderTextColor="#9A8FB5"
               value={formData.tipoHogar}
               onChangeText={(text) => actualizarCampo("tipoHogar", text)}
@@ -492,19 +555,18 @@ export default function DarAdopScreen() {
             <Text style={styles.label}>Requisitos de adopción</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
-              placeholder="Ej. Ser mayor de edad, compromiso responsable, seguimiento, espacio adecuado..."
+              placeholder="Ej. Visita, compromiso, seguimiento..."
               placeholderTextColor="#9A8FB5"
               multiline
               value={formData.requisitos}
               onChangeText={(text) => actualizarCampo("requisitos", text)}
             />
 
-            <Text style={styles.label}>Seguimiento posterior</Text>
+            <Text style={styles.label}>Seguimiento</Text>
             <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder="Ej. Se solicitarán fotos, visita previa, contacto durante las primeras semanas..."
+              style={styles.input}
+              placeholder="Ej. Se pedirán fotos cada mes"
               placeholderTextColor="#9A8FB5"
-              multiline
               value={formData.seguimiento}
               onChangeText={(text) => actualizarCampo("seguimiento", text)}
             />
@@ -512,32 +574,30 @@ export default function DarAdopScreen() {
             <Text style={styles.label}>Notas adicionales</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
-              placeholder="Información extra que quieras agregar"
+              placeholder="Información extra"
               placeholderTextColor="#9A8FB5"
               multiline
               value={formData.notas}
               onChangeText={(text) => actualizarCampo("notas", text)}
             />
+
+            <View style={styles.bottomActions}>
+              <TouchableOpacity style={styles.backStepButton} onPress={pasoAnterior}>
+                <Text style={styles.backStepButtonText}>Atrás</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.primaryButton, { flex: 1 }, guardando && { opacity: 0.7 }]}
+                onPress={publicarAdopcion}
+                disabled={guardando}
+              >
+                <Text style={styles.primaryButtonText}>
+                  {guardando ? "Publicando..." : "Publicar adopción"}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </>
         )}
-
-        <View style={styles.buttonsRow}>
-          {pasoActual === 2 && (
-            <TouchableOpacity style={styles.secondaryButton} onPress={pasoAnterior}>
-              <Text style={styles.secondaryButtonText}>Anterior</Text>
-            </TouchableOpacity>
-          )}
-
-          {pasoActual === 1 ? (
-            <TouchableOpacity style={styles.primaryButton} onPress={siguientePaso}>
-              <Text style={styles.primaryButtonText}>Siguiente</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity style={styles.primaryButton} onPress={guardarPlantilla}>
-              <Text style={styles.primaryButtonText}>Guardar plantilla</Text>
-            </TouchableOpacity>
-          )}
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -549,132 +609,123 @@ const styles = StyleSheet.create({
     backgroundColor: "#F6F2FF",
   },
   topHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    marginBottom: 2,
+    paddingHorizontal: 18,
+    paddingTop: 8,
   },
   backButton: {
     width: 42,
     height: 42,
-    borderRadius: 12,
-    backgroundColor: "#EFE7FF",
-    justifyContent: "center",
+    borderRadius: 21,
+    backgroundColor: "#EDE7FF",
     alignItems: "center",
+    justifyContent: "center",
   },
   scrollContent: {
-    padding: 20,
-    paddingBottom: 120,
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    paddingTop: 12,
   },
   title: {
     fontSize: 28,
     fontWeight: "800",
-    color: "#6A5ACD",
-    marginBottom: 6,
+    color: "#5B43B4",
+    marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: "#6B7280",
-    marginBottom: 20,
-    lineHeight: 20,
+    color: "#6D6487",
+    lineHeight: 21,
+    marginBottom: 22,
   },
   stepsWrapper: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    paddingVertical: 16,
-    paddingHorizontal: 14,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: "#E7DEFF",
+    marginBottom: 24,
   },
   stepsRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "center",
   },
   stepItem: {
     alignItems: "center",
-    flex: 1,
+    width: 90,
   },
   stepCircle: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: "#E9DFFF",
-    justifyContent: "center",
+    backgroundColor: "#DDD3FF",
     alignItems: "center",
-    marginBottom: 6,
+    justifyContent: "center",
   },
   stepCircleActive: {
     backgroundColor: "#7B61FF",
   },
   stepNumber: {
-    color: "#6A5ACD",
     fontWeight: "800",
+    color: "#6E62A6",
   },
   stepNumberActive: {
-    color: "#FFFFFF",
+    color: "white",
   },
   stepLabel: {
+    marginTop: 6,
     fontSize: 13,
-    color: "#8A7FB1",
+    color: "#8D82AE",
     fontWeight: "600",
   },
   stepLabelActive: {
-    color: "#6A5ACD",
+    color: "#5B43B4",
   },
   stepLine: {
     height: 2,
-    flex: 0.5,
-    backgroundColor: "#E5D9FF",
-    marginHorizontal: 8,
-    marginBottom: 20,
+    flex: 1,
+    backgroundColor: "#D8D0F5",
+    marginHorizontal: 10,
   },
   imageBox: {
-    height: 190,
-    borderRadius: 20,
-    backgroundColor: "#EFE7FF",
-    justifyContent: "center",
+    height: 200,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderStyle: "dashed",
+    borderColor: "#C8B8FF",
+    backgroundColor: "#FBF9FF",
     alignItems: "center",
-    marginBottom: 18,
+    justifyContent: "center",
+    marginBottom: 20,
     overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "#DDD6FE",
   },
   imagePlaceholderContent: {
     alignItems: "center",
     justifyContent: "center",
   },
   imageText: {
+    marginTop: 10,
     color: "#7B61FF",
-    fontSize: 15,
     fontWeight: "700",
-    marginTop: 8,
   },
   imagePreview: {
     width: "100%",
     height: "100%",
   },
   label: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "700",
-    color: "#4B5563",
+    color: "#5D517D",
     marginBottom: 8,
-    marginTop: 10,
+    marginTop: 12,
   },
   input: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    backgroundColor: "white",
+    borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 13,
-    fontSize: 15,
-    color: "#1F2937",
+    fontSize: 14,
+    color: "#2E2A3B",
     borderWidth: 1,
-    borderColor: "#DDD6FE",
+    borderColor: "#DDD4F3",
   },
   textArea: {
-    minHeight: 110,
+    minHeight: 95,
     textAlignVertical: "top",
   },
   rowOptions: {
@@ -683,97 +734,78 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   optionButton: {
-    backgroundColor: "#EDE9FE",
-    borderRadius: 20,
+    backgroundColor: "#EEE8FF",
+    borderRadius: 999,
+    paddingHorizontal: 14,
     paddingVertical: 10,
-    paddingHorizontal: 16,
-    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: "#DDD4F3",
   },
   optionButtonActive: {
-    backgroundColor: "#7C3AED",
+    backgroundColor: "#7B61FF",
+    borderColor: "#7B61FF",
   },
   optionText: {
-    color: "#6D28D9",
-    fontWeight: "600",
+    color: "#5D517D",
+    fontWeight: "700",
+    fontSize: 13,
   },
   optionTextActive: {
-    color: "#FFFFFF",
-  },
-  noticeBox: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    backgroundColor: "#F1EDFF",
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: "#DED4FF",
-    gap: 10,
-  },
-  noticeText: {
-    flex: 1,
-    color: "#5B4D8A",
-    fontSize: 13.5,
-    lineHeight: 20,
-  },
-  locationButton: {
-    backgroundColor: "#C4B5FD",
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 4,
-  },
-  locationButtonText: {
-    color: "#4C1D95",
-    fontWeight: "700",
-  },
-  locationBox: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 14,
-    padding: 14,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: "#DDD6FE",
-  },
-  locationText: {
-    color: "#374151",
-    marginBottom: 8,
-  },
-  mapLink: {
-    color: "#7C3AED",
-    fontWeight: "700",
-  },
-  buttonsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 26,
-    gap: 12,
-  },
-  secondaryButton: {
-    flex: 1,
-    backgroundColor: "#E9DFFF",
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: "center",
-  },
-  secondaryButtonText: {
-    color: "#6A5ACD",
-    fontSize: 15,
-    fontWeight: "800",
+    color: "white",
   },
   primaryButton: {
-    flex: 1,
+    marginTop: 22,
     backgroundColor: "#7B61FF",
-    borderRadius: 16,
-    paddingVertical: 16,
+    borderRadius: 14,
+    height: 50,
     alignItems: "center",
+    justifyContent: "center",
   },
   primaryButtonText: {
-    color: "#FFFFFF",
+    color: "white",
+    fontWeight: "800",
     fontSize: 15,
+  },
+  secondaryButton: {
+    marginTop: 12,
+    backgroundColor: "#ECE5FF",
+    borderRadius: 14,
+    height: 46,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  secondaryButtonText: {
+    color: "#6A52D9",
+    fontWeight: "800",
+  },
+  mapButton: {
+    marginTop: 10,
+    backgroundColor: "#F3EEFF",
+    borderRadius: 14,
+    height: 42,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  mapButtonText: {
+    color: "#6A52D9",
+    fontWeight: "700",
+  },
+  bottomActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 18,
+    alignItems: "center",
+  },
+  backStepButton: {
+    height: 50,
+    paddingHorizontal: 20,
+    borderRadius: 14,
+    backgroundColor: "#E9E2FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  backStepButtonText: {
+    color: "#6A52D9",
     fontWeight: "800",
   },
 });
