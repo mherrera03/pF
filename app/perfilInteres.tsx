@@ -1,26 +1,36 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  serverTimestamp,
+  setDoc,
+} from "firebase/firestore";
 import { useState } from "react";
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Linking,
-    Platform,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Linking,
+  Platform,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { auth, db } from "../config/firebase";
 
 export default function PerfilInteresScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
 
+  const petId = typeof params.petId === "string" ? params.petId : "";
   const mascotaNombre =
     typeof params.petName === "string" ? params.petName : "esta mascota";
   const mascotaRaza =
@@ -34,6 +44,8 @@ export default function PerfilInteresScreen() {
     latitude: number;
     longitude: number;
   } | null>(null);
+
+  const [enviando, setEnviando] = useState(false);
 
   const [formData, setFormData] = useState({
     nombreCompleto: "",
@@ -115,15 +127,157 @@ export default function PerfilInteresScreen() {
     return true;
   };
 
-  const enviarPerfil = () => {
+  const generarChatId = (uid1: string, uid2: string) => {
+    return [uid1, uid2].sort().join("_");
+  };
+
+  const enviarPerfil = async () => {
     if (!validarFormulario()) return;
 
-    Alert.alert(
-      "Perfil enviado 💜",
-      `Tu perfil de interés para ${mascotaNombre} fue enviado correctamente. Si el responsable continúa el proceso, luego podrás completar la fase 2.`
-    );
+    try {
+      setEnviando(true);
 
-    router.back();
+      const interesadoUid = auth.currentUser?.uid;
+
+      if (!interesadoUid) {
+        Alert.alert("Error", "Debes iniciar sesión para enviar tu perfil.");
+        return;
+      }
+
+      if (!petId) {
+        Alert.alert("Error", "No se encontró la mascota seleccionada.");
+        return;
+      }
+
+      const adopcionRef = doc(db, "adopciones", petId);
+      const adopcionSnap = await getDoc(adopcionRef);
+
+      if (!adopcionSnap.exists()) {
+        Alert.alert("Error", "La publicación de adopción ya no está disponible.");
+        return;
+      }
+
+      const adopcionData = adopcionSnap.data();
+
+      const ownerUid = adopcionData.ownerUid;
+      const ownerName = adopcionData.ownerName || "Responsable";
+      const petName = adopcionData.nombre || mascotaNombre;
+
+      if (!ownerUid) {
+        Alert.alert("Error", "No se encontró el responsable de esta mascota.");
+        return;
+      }
+
+      if (ownerUid === interesadoUid) {
+        Alert.alert("Aviso", "No puedes enviar una solicitud a tu propia publicación.");
+        return;
+      }
+
+      let interesadoNombre = formData.nombreCompleto.trim();
+
+      const userRef = doc(db, "users", interesadoUid);
+      const userSnap = await getDoc(userRef);
+
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        interesadoNombre =
+          userData.nombre ||
+          userData.name ||
+          userData.username ||
+          formData.nombreCompleto.trim();
+      }
+
+      await addDoc(collection(db, "solicitudesAdopcion"), {
+        petId,
+        petName,
+        ownerUid,
+        ownerName,
+        interesadoUid,
+        interesadoNombre,
+
+        nombreCompleto: formData.nombreCompleto.trim(),
+        telefono: formData.telefono.trim(),
+        edad: formData.edad.trim(),
+        ubicacion: formData.ubicacion.trim(),
+        coords: coords || null,
+        motivoInteres: formData.motivoInteres.trim(),
+        experienciaMascotas: formData.experienciaMascotas.trim(),
+        cuidadorPrincipal: formData.cuidadorPrincipal.trim(),
+        expectativas: formData.expectativas.trim(),
+
+        estado: "pendiente",
+        createdAt: serverTimestamp(),
+      });
+
+      const chatId = generarChatId(interesadoUid, ownerUid);
+      const chatRef = doc(db, "chats", chatId);
+
+      const mensajeAutomatico = `Hola, estoy interesado en adoptar a ${petName}. Ya envié mi perfil de interés.`;
+
+      await setDoc(
+        chatRef,
+        {
+          participantes: [interesadoUid, ownerUid],
+          participantesInfo: {
+            [interesadoUid]: {
+              nombre: interesadoNombre,
+              foto: "https://i.pravatar.cc/150?img=12",
+            },
+            [ownerUid]: {
+              nombre: ownerName,
+              foto: "https://i.pravatar.cc/150?img=32",
+            },
+          },
+          relatedPetId: petId,
+          relatedPetName: petName,
+          ultimoMensaje: mensajeAutomatico,
+          ultimoMensajeEnviadoPor: interesadoUid,
+          actualizadoEn: serverTimestamp(),
+          createdAt: serverTimestamp(),
+          unreadCount: {
+            [interesadoUid]: 0,
+            [ownerUid]: 1,
+          },
+          lastReadAt: {
+            [interesadoUid]: serverTimestamp(),
+          },
+        },
+        { merge: true }
+      );
+
+      await addDoc(collection(db, "chats", chatId, "mensajes"), {
+        text: mensajeAutomatico,
+        senderId: interesadoUid,
+        senderName: interesadoNombre,
+        createdAt: serverTimestamp(),
+        tipo: "solicitud_adopcion",
+        petId,
+        petName,
+
+        perfilInteres: {
+          nombreCompleto: formData.nombreCompleto.trim(),
+          telefono: formData.telefono.trim(),
+          edad: formData.edad.trim(),
+          ubicacion: formData.ubicacion.trim(),
+          motivoInteres: formData.motivoInteres.trim(),
+          experienciaMascotas: formData.experienciaMascotas.trim(),
+          cuidadorPrincipal: formData.cuidadorPrincipal.trim(),
+          expectativas: formData.expectativas.trim(),
+        },
+      });
+
+      Alert.alert(
+        "Perfil enviado 💜",
+        `Tu perfil de interés para ${petName} fue enviado correctamente. El responsable podrá verlo en el chat.`
+      );
+
+      router.back();
+    } catch (error) {
+      console.log("Error enviando perfil:", error);
+      Alert.alert("Error", "No se pudo enviar el perfil de interés.");
+    } finally {
+      setEnviando(false);
+    }
   };
 
   return (
@@ -293,9 +447,13 @@ export default function PerfilInteresScreen() {
             onChangeText={(text) => actualizarCampo("expectativas", text)}
           />
 
-          <TouchableOpacity style={styles.primaryButton} onPress={enviarPerfil}>
+          <TouchableOpacity
+            style={[styles.primaryButton, enviando && { opacity: 0.7 }]}
+            onPress={enviarPerfil}
+            disabled={enviando}
+          >
             <Text style={styles.primaryButtonText}>
-              Enviar perfil de interés
+              {enviando ? "Enviando..." : "Enviar perfil de interés"}
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -408,37 +566,38 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
   },
   textAreaSmall: {
-    minHeight: 80,
+    minHeight: 86,
     textAlignVertical: "top",
   },
   locationButton: {
-    backgroundColor: "#C4B5FD",
-    paddingVertical: 14,
-    borderRadius: 14,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    flexDirection: "row",
+    backgroundColor: "#EDE9FE",
+    borderRadius: 14,
+    paddingVertical: 13,
     gap: 8,
-    marginTop: 4,
   },
   locationButtonText: {
     color: "#4C1D95",
     fontWeight: "700",
+    fontSize: 14,
   },
   locationBox: {
     backgroundColor: "#FFFFFF",
     borderRadius: 14,
-    padding: 14,
-    marginTop: 12,
+    padding: 12,
+    marginTop: 10,
     borderWidth: 1,
     borderColor: "#DDD6FE",
   },
   locationText: {
     color: "#374151",
+    fontSize: 13.5,
     marginBottom: 8,
   },
   mapLink: {
-    color: "#7C3AED",
+    color: "#6A5ACD",
     fontWeight: "700",
   },
   primaryButton: {
@@ -446,11 +605,12 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingVertical: 16,
     alignItems: "center",
-    marginTop: 26,
+    marginTop: 22,
+    marginBottom: 30,
   },
   primaryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 15,
+    color: "white",
     fontWeight: "800",
+    fontSize: 15,
   },
 });

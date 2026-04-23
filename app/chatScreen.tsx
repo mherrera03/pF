@@ -1,26 +1,26 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
-    addDoc,
-    collection,
-    doc,
-    increment,
-    onSnapshot,
-    orderBy,
-    query,
-    serverTimestamp,
-    updateDoc,
+  addDoc,
+  collection,
+  doc,
+  increment,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  updateDoc,
 } from "firebase/firestore";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-    FlatList,
-    Image,
-    KeyboardAvoidingView,
-    Platform,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -30,8 +30,21 @@ type Mensaje = {
   id: string;
   texto: string;
   senderId: string;
+  senderName?: string;
   createdAt?: any;
   tipo?: string;
+  petId?: string;
+  petName?: string;
+  perfilInteres?: {
+    nombreCompleto?: string;
+    telefono?: string;
+    edad?: string;
+    ubicacion?: string;
+    motivoInteres?: string;
+    experienciaMascotas?: string;
+    cuidadorPrincipal?: string;
+    expectativas?: string;
+  };
 };
 
 function formatearHora(fecha: any) {
@@ -119,10 +132,14 @@ export default function ChatScreen() {
           const data = docSnap.data() as any;
           return {
             id: docSnap.id,
-            texto: data.texto || "",
+            texto: data.text || data.texto || "",
             senderId: data.senderId || "",
+            senderName: data.senderName || "",
             createdAt: data.createdAt,
             tipo: data.tipo || "texto",
+            petId: data.petId || "",
+            petName: data.petName || "",
+            perfilInteres: data.perfilInteres || null,
           };
         });
 
@@ -277,66 +294,145 @@ export default function ChatScreen() {
               typeof chatInfo.lastReadAtOtro?.toDate === "function" &&
               chatInfo.lastReadAtOtro.toDate() >= item.createdAt.toDate();
 
+            const esSolicitud =
+              item.tipo === "solicitud_adopcion" && item.perfilInteres;
+
             return (
               <View
                 style={{
                   alignSelf: mio ? "flex-end" : "flex-start",
-                  maxWidth: "80%",
+                  maxWidth: "86%",
                   marginBottom: 10,
                 }}
               >
-                <View
-                  style={{
-                    backgroundColor: mio ? "#7B61FF" : "#FFFFFF",
-                    paddingHorizontal: 14,
-                    paddingVertical: 10,
-                    borderRadius: 18,
-                    borderBottomRightRadius: mio ? 6 : 18,
-                    borderBottomLeftRadius: mio ? 18 : 6,
-                    borderWidth: mio ? 0 : 1,
-                    borderColor: "#E9DFFF",
-                  }}
-                >
-                  <Text
+                {esSolicitud ? (
+                  <View
                     style={{
-                      color: mio ? "#FFFFFF" : "#2D1B69",
-                      fontSize: 14,
-                      lineHeight: 20,
+                      backgroundColor: mio ? "#EDE7FF" : "#FFFFFF",
+                      padding: 12,
+                      borderRadius: 18,
+                      borderWidth: 1,
+                      borderColor: "#D9CCFF",
                     }}
                   >
-                    {item.texto}
-                  </Text>
-                </View>
+                    <Text
+                      style={{
+                        fontSize: 16,
+                        fontWeight: "800",
+                        color: "#5E35B1",
+                        marginBottom: 8,
+                      }}
+                    >
+                      Perfil de interés
+                    </Text>
+
+                    {!!item.petName && (
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: "700",
+                          color: "#4B5563",
+                          marginBottom: 8,
+                        }}
+                      >
+                        Mascota: {item.petName}
+                      </Text>
+                    )}
+
+                    <Text style={{ fontSize: 13, color: "#374151", marginBottom: 4 }}>
+                      <Text style={{ fontWeight: "700" }}>Nombre: </Text>
+                      {item.perfilInteres?.nombreCompleto || "No especificado"}
+                    </Text>
+
+                    <Text style={{ fontSize: 13, color: "#374151", marginBottom: 4 }}>
+                      <Text style={{ fontWeight: "700" }}>Teléfono: </Text>
+                      {item.perfilInteres?.telefono || "No especificado"}
+                    </Text>
+
+                    <Text style={{ fontSize: 13, color: "#374151", marginBottom: 4 }}>
+                      <Text style={{ fontWeight: "700" }}>Edad: </Text>
+                      {item.perfilInteres?.edad || "No especificada"}
+                    </Text>
+
+                    <Text style={{ fontSize: 13, color: "#374151", marginBottom: 4 }}>
+                      <Text style={{ fontWeight: "700" }}>Ubicación: </Text>
+                      {item.perfilInteres?.ubicacion || "No especificada"}
+                    </Text>
+
+                    <Text style={{ fontSize: 13, color: "#374151", marginBottom: 4 }}>
+                      <Text style={{ fontWeight: "700" }}>Motivo: </Text>
+                      {item.perfilInteres?.motivoInteres || "No especificado"}
+                    </Text>
+
+                    <Text style={{ fontSize: 13, color: "#374151", marginBottom: 4 }}>
+                      <Text style={{ fontWeight: "700" }}>Experiencia: </Text>
+                      {item.perfilInteres?.experienciaMascotas || "No especificada"}
+                    </Text>
+
+                    <Text style={{ fontSize: 13, color: "#374151", marginBottom: 4 }}>
+                      <Text style={{ fontWeight: "700" }}>Cuidador principal: </Text>
+                      {item.perfilInteres?.cuidadorPrincipal || "No especificado"}
+                    </Text>
+
+                    <Text style={{ fontSize: 13, color: "#374151" }}>
+                      <Text style={{ fontWeight: "700" }}>Expectativas: </Text>
+                      {item.perfilInteres?.expectativas || "No especificadas"}
+                    </Text>
+                  </View>
+                ) : (
+                  <View
+                    style={{
+                      backgroundColor: mio ? "#7B61FF" : "#FFFFFF",
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      borderRadius: 18,
+                      borderBottomRightRadius: mio ? 6 : 18,
+                      borderBottomLeftRadius: mio ? 18 : 6,
+                      borderWidth: mio ? 0 : 1,
+                      borderColor: "#E9DFFF",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: mio ? "#FFFFFF" : "#2D1B69",
+                        fontSize: 14,
+                        lineHeight: 20,
+                      }}
+                    >
+                      {item.texto}
+                    </Text>
+                  </View>
+                )}
 
                 <View
-                style={{
+                  style={{
                     flexDirection: "row",
                     alignItems: "center",
                     marginTop: 4,
                     alignSelf: mio ? "flex-end" : "flex-start",
-                }}
+                  }}
                 >
-                <Text
+                  <Text
                     style={{
-                    fontSize: 11,
-                    color: "#8E8AAE",
+                      fontSize: 11,
+                      color: "#8E8AAE",
                     }}
-                >
+                  >
                     {formatearHora(item.createdAt)}
-                </Text>
+                  </Text>
 
-                {mio && (
+                  {mio && (
                     <Text
-                    style={{
+                      style={{
                         fontSize: 11,
                         marginLeft: 6,
                         color: visto ? "#34B7F1" : "#8E8AAE",
                         fontWeight: "700",
-                    }}
+                      }}
                     >
-                    {visto ? "✓✓" : "✓"}
+                      {visto ? "✓✓" : "✓"}
                     </Text>
-                )}
+                  )}
                 </View>
               </View>
             );
