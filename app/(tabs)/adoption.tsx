@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
+import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
@@ -12,7 +13,6 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
-import { collection, getDocs, orderBy, query } from "firebase/firestore";
 import { db } from "../../config/firebase";
 
 type PetType = "Perro" | "Gato" | "Ave" | "Otro";
@@ -278,18 +278,12 @@ function AdoptionPetCard({ pet }: { pet: AdoptionPet }) {
         style={styles.wantButton}
         onPress={() =>
           router.push({
-            pathname: "/perfilInteres",
-            params: {
-              petId: pet.id,
-              petName: pet.nombre,
-              petBreed: pet.raza,
-              petAge: pet.edad,
-              petGender: pet.sexo,
-            },
+            pathname: "/infoAdopcion",
+            params: { id: pet.id },
           })
         }
       >
-        <Text style={{ color: "white", fontWeight: "bold" }}>Quiero adoptar</Text>
+        <Text style={{ color: "white", fontWeight: "bold" }}>Ver información</Text>
       </TouchableOpacity>
     </View>
   );

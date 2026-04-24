@@ -9,9 +9,14 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.jvalencia3009.pff",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
+      "package": "com.jvalencia3009.pff",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -45,6 +50,12 @@
       "typedRoutes": true,
       "reactCompiler": true
     },
-    "owner": "jvalencia3009"
+    "owner": "jvalencia3009",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "95f6c5e5-5020-4a11-b648-2d97b76e3c13"
+      }
+    }
   }
 }

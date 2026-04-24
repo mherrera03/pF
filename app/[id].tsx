@@ -13,7 +13,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import MapView, { Marker } from "react-native-maps";
 
 import { auth, db } from "../config/firebase";
 import { crearOObtenerChat } from "../services/chatService";
@@ -22,7 +21,8 @@ const { width } = Dimensions.get("window");
 const CAROUSEL_WIDTH = width - 40;
 
 export default function DetalleReporte() {
-  const { id } = useLocalSearchParams();
+  const params = useLocalSearchParams();
+  const id = typeof params.id === "string" ? params.id : "";
   const router = useRouter();
   const [reporte, setReporte] = useState<any>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -67,11 +67,22 @@ export default function DetalleReporte() {
     return [];
   }, [reporte]);
 
+  const coordsValidas = useMemo(() => {
+    const lat = Number(reporte?.coords?.latitude);
+    const lng = Number(reporte?.coords?.longitude);
+
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return null;
+    }
+
+    return { latitude: lat, longitude: lng };
+  }, [reporte]);
+
   const abrirMaps = () => {
-    if (!reporte?.coords) return;
+    if (!coordsValidas) return;
 
     Linking.openURL(
-      `https://www.google.com/maps/search/?api=1&query=${reporte.coords.latitude},${reporte.coords.longitude}`
+      `https://www.google.com/maps/search/?api=1&query=${coordsValidas.latitude},${coordsValidas.longitude}`
     );
   };
 
@@ -256,26 +267,12 @@ export default function DetalleReporte() {
         </View>
       </View>
 
-      {reporte.coords && (
+      {coordsValidas && (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Ubicación</Text>
-
-          <MapView
-            style={styles.map}
-            initialRegion={{
-              latitude: reporte.coords.latitude,
-              longitude: reporte.coords.longitude,
-              latitudeDelta: 0.01,
-              longitudeDelta: 0.01,
-            }}
-          >
-            <Marker
-              coordinate={{
-                latitude: reporte.coords.latitude,
-                longitude: reporte.coords.longitude,
-              }}
-            />
-          </MapView>
+          <Text style={styles.description}>
+            La ubicación del reporte está disponible para abrirse en Google Maps.
+          </Text>
 
           <TouchableOpacity style={styles.mapButton} onPress={abrirMaps}>
             <Text style={styles.mapButtonText}>Abrir en Google Maps</Text>
