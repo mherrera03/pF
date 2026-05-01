@@ -1,5 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { onAuthStateChanged } from "firebase/auth";
+import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
 import {
   FlatList,
@@ -14,8 +16,6 @@ import {
   View,
 } from "react-native";
 
-import { onAuthStateChanged } from "firebase/auth";
-import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
 import { auth, db } from "../../config/firebase";
 import { crearOObtenerChat } from "../../services/chatService";
 

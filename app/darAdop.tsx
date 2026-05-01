@@ -1,9 +1,8 @@
-import {addDoc,collection,serverTimestamp,doc,getDoc,} from "firebase/firestore";
-import * as FileSystem from "expo-file-system/legacy";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
+import { addDoc, collection, doc, getDoc, serverTimestamp, } from "firebase/firestore";
 import { useState } from "react";
 import {
   Alert,
@@ -24,8 +23,8 @@ import { uploadToImageKitFromBase64 } from "../services/imageUpload";
 export default function DarAdopScreen() {
   const router = useRouter();
   const [pasoActual, setPasoActual] = useState<1 | 2>(1);
-  const [image, setImage] = useState<string | null>(null);
-  const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [images, setImages] = useState<string[]>([]);
+  const [imagesBase64, setImagesBase64] = useState<string[]>([]);
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -61,31 +60,49 @@ export default function DarAdopScreen() {
   };
 
   const seleccionarImagen = async () => {
-    const permiso = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  const permiso = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-    if (!permiso.granted) {
-      Alert.alert("Permiso requerido", "Debes permitir acceso a la galería.");
-      return;
-    }
+  if (!permiso.granted) {
+    Alert.alert("Permiso requerido", "Debes permitir acceso a la galería.");
+    return;
+  }
 
-    const resultado = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      quality: 0.8,
-      allowsEditing: true,
-      aspect: [4, 4],
-      base64: true,
-    });
+  const cuposRestantes = 5 - images.length;
 
-    if (!resultado.canceled) {
-      const asset = resultado.assets[0];
+  if (cuposRestantes <= 0) {
+    Alert.alert("Límite alcanzado", "Solo puedes subir un máximo de 5 fotos.");
+    return;
+  }
 
-      setImage(asset.uri);
-      setImageBase64(asset.base64 ?? null);
+  const resultado = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ["images"],
+    quality: 0.8,
+    allowsEditing: false,
+    allowsMultipleSelection: true,
+    selectionLimit: cuposRestantes,
+    base64: true,
+  });
 
-      console.log("Imagen seleccionada:", asset.uri);
-      console.log("Base64 disponible:", !!asset.base64);
-    }
-  };
+  if (!resultado.canceled) {
+    const nuevasUris = resultado.assets.map((asset) => asset.uri);
+    const nuevasBase64 = resultado.assets
+      .map((asset) => asset.base64 ?? "")
+      .filter(Boolean);
+
+    const totalUris = [...images, ...nuevasUris].slice(0, 5);
+    const totalBase64 = [...imagesBase64, ...nuevasBase64].slice(0, 5);
+
+    setImages(totalUris);
+    setImagesBase64(totalBase64);
+
+    console.log("Fotos seleccionadas:", totalUris.length);
+  }
+};
+
+const eliminarImagen = (index: number) => {
+  setImages((prev) => prev.filter((_, i) => i !== index));
+  setImagesBase64((prev) => prev.filter((_, i) => i !== index));
+};
 
   const obtenerUbicacion = async () => {
     try {
@@ -155,6 +172,11 @@ export default function DarAdopScreen() {
       return false;
     }
 
+    if (images.length === 0) {
+      Alert.alert("Falta información", "Agrega al menos una foto de la mascota.");
+      return false;
+    }
+
     return true;
   };
 
@@ -193,19 +215,15 @@ export default function DarAdopScreen() {
     try {
       setGuardando(true);
 
-      let fotoUrl: string | null = null;
+      let fotosUrls: string[] = [];
 
-      console.log("Iniciando publicación...");
-      console.log("Imagen seleccionada:", image);
+      if (imagesBase64.length > 0) {
+        console.log("Subiendo fotos de adopción...");
 
-      if (image && !imageBase64) {
-        Alert.alert("Error", "No se pudo preparar la imagen para subir.");
-        return;
-      }
-
-      if (imageBase64) {
-        console.log("Subiendo imagen desde base64...");
-        fotoUrl = await uploadToImageKitFromBase64(imageBase64);
+        for (const base64 of imagesBase64) {
+          const url = await uploadToImageKitFromBase64(base64);
+          fotosUrls.push(url);
+        }
       }
 
       const uid = auth.currentUser?.uid;
@@ -261,7 +279,8 @@ export default function DarAdopScreen() {
         seguimiento: formData.seguimiento.trim(),
         notas: formData.notas.trim(),
 
-        fotoUrl,
+        fotosUrls,
+        fotoUrl: fotosUrls[0] || null,
         estado: "disponible",
         createdAt: serverTimestamp(),
       });
@@ -379,20 +398,38 @@ export default function DarAdopScreen() {
 
         {pasoActual === 1 ? (
           <>
-            <TouchableOpacity style={styles.imageBox} onPress={seleccionarImagen}>
-              {image ? (
-                <Image source={{ uri: image }} style={styles.imagePreview} />
-              ) : (
-                <View style={styles.imagePlaceholderContent}>
-                  <MaterialCommunityIcons
-                    name="camera-plus-outline"
-                    size={34}
-                    color="#7B61FF"
-                  />
-                  <Text style={styles.imageText}>Agregar foto de la mascota</Text>
-                </View>
-              )}
+            <Text style={styles.label}>Fotos de la mascota</Text>
+
+            <TouchableOpacity style={styles.imageAddBox} onPress={seleccionarImagen}>
+              <MaterialCommunityIcons
+                name="camera-plus-outline"
+                size={34}
+                color="#7B61FF"
+              />
+              <Text style={styles.imageText}>
+                {images.length === 0
+                  ? "Agregar fotos de la mascota"
+                  : `Agregar más fotos (${images.length}/5)`}
+              </Text>
             </TouchableOpacity>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingVertical: 10 }}
+            >
+              {images.map((uri, index) => (
+                <View key={`${uri}-${index}`} style={styles.previewWrap}>
+                  <Image source={{ uri }} style={styles.previewImage} />
+                  <TouchableOpacity
+                    style={styles.removeImageButton}
+                    onPress={() => eliminarImagen(index)}
+                  >
+                    <MaterialCommunityIcons name="close" size={16} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
 
             <Text style={styles.label}>Nombre</Text>
             <TextInput
@@ -604,6 +641,37 @@ export default function DarAdopScreen() {
 }
 
 const styles = StyleSheet.create({
+  imageAddBox: {
+  height: 130,
+  borderRadius: 18,
+  borderWidth: 2,
+  borderStyle: "dashed",
+  borderColor: "#C8B8FF",
+  backgroundColor: "#FBF9FF",
+  alignItems: "center",
+  justifyContent: "center",
+  marginBottom: 10,
+},
+previewWrap: {
+  marginRight: 10,
+  position: "relative",
+},
+previewImage: {
+  width: 110,
+  height: 110,
+  borderRadius: 16,
+},
+removeImageButton: {
+  position: "absolute",
+  top: 6,
+  right: 6,
+  width: 24,
+  height: 24,
+  borderRadius: 12,
+  backgroundColor: "rgba(0,0,0,0.65)",
+  alignItems: "center",
+  justifyContent: "center",
+},
   container: {
     flex: 1,
     backgroundColor: "#F6F2FF",

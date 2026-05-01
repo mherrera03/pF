@@ -1,35 +1,41 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
-import { Platform } from 'react-native';
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Tabs } from "expo-router";
+import { useEffect } from "react";
+import { Platform } from "react-native";
+
+import { registrarPushTokenUsuario } from "../../services/notifications";
 
 export default function TabLayout() {
+  useEffect(() => {
+    registrarPushTokenUsuario();
+  }, []);
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#7E57C2',
-        tabBarInactiveTintColor: '#9E9E9E',
-        
-        
+        tabBarActiveTintColor: "#7E57C2",
+        tabBarInactiveTintColor: "#9E9E9E",
+
         tabBarStyle: {
-          backgroundColor: '#FFFFFF',
-          height: Platform.OS === 'ios' ? 100 : 110,
+          backgroundColor: "#FFFFFF",
+          height: Platform.OS === "ios" ? 100 : 110,
           borderTopWidth: 1,
-          borderTopColor: '#F0F0F0', 
-          paddingBottom: Platform.OS === 'ios' ? 30 : 12,
+          borderTopColor: "#F0F0F0",
+          paddingBottom: Platform.OS === "ios" ? 30 : 12,
           paddingTop: 10,
         },
 
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: '600',
+          fontWeight: "600",
         },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Inicio',
+          title: "Inicio",
           tabBarIcon: ({ color }) => (
             <MaterialCommunityIcons name="home" size={28} color={color} />
           ),
@@ -39,25 +45,27 @@ export default function TabLayout() {
       <Tabs.Screen
         name="adoption"
         options={{
-          title: 'Adopción',
+          title: "Adopción",
           tabBarIcon: ({ color }) => (
             <MaterialCommunityIcons name="heart" size={28} color={color} />
           ),
         }}
       />
-       <Tabs.Screen
+
+      <Tabs.Screen
         name="chatDetalle"
         options={{
-          title: 'Chats',
+          title: "Chats",
           tabBarIcon: ({ color }) => (
             <MaterialCommunityIcons name="chat" size={28} color={color} />
           ),
         }}
       />
+
       <Tabs.Screen
         name="citas"
         options={{
-          title: 'Citas',
+          title: "Citas",
           tabBarIcon: ({ color }) => (
             <MaterialCommunityIcons name="calendar" size={28} color={color} />
           ),
@@ -67,7 +75,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="perfil"
         options={{
-          title: 'Perfil',
+          title: "Perfil",
           tabBarIcon: ({ color }) => (
             <MaterialCommunityIcons name="account" size={28} color={color} />
           ),

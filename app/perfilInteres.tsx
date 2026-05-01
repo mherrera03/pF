@@ -25,6 +25,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { auth, db } from "../config/firebase";
+import { enviarPushNotificationExpo } from "../services/notifications";
 
 export default function PerfilInteresScreen() {
   const router = useRouter();
@@ -129,6 +130,73 @@ export default function PerfilInteresScreen() {
 
   const generarChatId = (uid1: string, uid2: string) => {
     return [uid1, uid2].sort().join("_");
+  };
+
+  const crearNotificacionSolicitudAdopcion = async ({
+    ownerUid,
+    interesadoUid,
+    interesadoNombre,
+    petId,
+    petName,
+  }: {
+    ownerUid: string;
+    interesadoUid: string;
+    interesadoNombre: string;
+    petId: string;
+    petName: string;
+  }) => {
+    try {
+      const ownerRef = doc(db, "users", ownerUid);
+      const ownerSnap = await getDoc(ownerRef);
+
+      const ownerData = ownerSnap.exists() ? ownerSnap.data() : null;
+
+      const notificationSettings = ownerData?.notificationSettings;
+
+      const solicitudesActivas =
+        notificationSettings?.solicitudesAdopcion !== false;
+
+      if (!solicitudesActivas) {
+        console.log(
+          "Notificación de adopción no creada porque el usuario la desactivó."
+        );
+        return;
+      }
+
+      const titulo = "Nueva solicitud de adopción";
+      const mensaje = `${interesadoNombre} quiere adoptar a ${petName}. Revisa su perfil de interés en el chat.`;
+
+      await addDoc(collection(db, "notificaciones"), {
+        ownerUid,
+        interesadoUid,
+        tipo: "adopcion",
+        titulo,
+        mensaje,
+        leida: false,
+        petId,
+        petName,
+        createdAt: serverTimestamp(),
+      });
+
+      const expoPushToken = ownerData?.expoPushToken;
+
+      if (expoPushToken) {
+        await enviarPushNotificationExpo({
+          expoPushToken,
+          titulo,
+          mensaje,
+          data: {
+            tipo: "adopcion",
+            petId,
+            petName,
+          },
+        });
+      } else {
+        console.log("El dueño no tiene expoPushToken guardado.");
+      }
+    } catch (error) {
+      console.log("Error creando notificación de adopción:", error);
+    }
   };
 
   const enviarPerfil = async () => {
@@ -264,6 +332,14 @@ export default function PerfilInteresScreen() {
           cuidadorPrincipal: formData.cuidadorPrincipal.trim(),
           expectativas: formData.expectativas.trim(),
         },
+      });
+
+      await crearNotificacionSolicitudAdopcion({
+        ownerUid,
+        interesadoUid,
+        interesadoNombre,
+        petId,
+        petName,
       });
 
       Alert.alert(

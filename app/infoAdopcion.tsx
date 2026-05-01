@@ -3,15 +3,15 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
 import { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
-    Image,
-    Linking,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Image,
+  Linking,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { db } from "../config/firebase";
@@ -42,6 +42,7 @@ type AdoptionDetail = {
   seguimiento?: string;
   notas?: string;
   fotoUrl?: string | null;
+  fotosUrls?: string[];
   ownerName?: string;
   ownerUid?: string;
 };
@@ -86,6 +87,18 @@ export default function AdoptionDetailScreen() {
 
   const nombreMascota = useMemo(() => mascota?.nombre || "Mascota", [mascota]);
 
+  const fotos = useMemo(() => {
+    if (Array.isArray(mascota?.fotosUrls) && mascota.fotosUrls.length > 0) {
+      return mascota.fotosUrls;
+    }
+
+    if (mascota?.fotoUrl) {
+      return [mascota.fotoUrl];
+    }
+
+    return [];
+  }, [mascota]);
+
   const abrirTelefono = async () => {
     if (!mascota?.telefono) return;
     const url = `tel:${mascota.telefono}`;
@@ -123,13 +136,34 @@ export default function AdoptionDetailScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        {mascota.fotoUrl ? (
-          <Image source={{ uri: mascota.fotoUrl }} style={styles.heroImage} />
-        ) : (
-          <View style={styles.heroPlaceholder}>
-            <MaterialIcons name="pets" size={54} color="#9575CD" />
-          </View>
+            {fotos.length > 0 ? (
+      <>
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          style={styles.carousel}
+        >
+          {fotos.map((foto, index) => (
+            <Image
+              key={`${foto}-${index}`}
+              source={{ uri: foto }}
+              style={styles.heroImage}
+            />
+          ))}
+        </ScrollView>
+
+        {fotos.length > 1 && (
+          <Text style={styles.carouselCount}>
+            {fotos.length} fotos
+          </Text>
         )}
+      </>
+    ) : (
+      <View style={styles.heroPlaceholder}>
+        <MaterialIcons name="pets" size={54} color="#9575CD" />
+      </View>
+    )}
 
         <View style={styles.headerCard}>
           <Text style={styles.name}>{mascota.nombre || "Sin nombre"}</Text>
@@ -194,6 +228,8 @@ export default function AdoptionDetailScreen() {
                 petBreed: mascota.raza || "",
                 petAge: mascota.edad || "",
                 petGender: mascota.sexo || "",
+                ownerUid: mascota.ownerUid || "",
+                ownerName: mascota.ownerName || mascota.contactoNombre || "Usuario",
               },
             })
           }
@@ -230,6 +266,17 @@ function InfoRow({ label, value }: { label: string; value?: string | null }) {
 }
 
 const styles = StyleSheet.create({
+  carousel: {
+  marginTop: 8,
+  marginBottom: 10,
+},
+carouselCount: {
+  marginBottom: 12,
+  textAlign: "center",
+  color: "#6B7280",
+  fontSize: 12,
+  fontWeight: "700",
+},
   container: { flex: 1, backgroundColor: "#F6F2FF" },
   centered: {
     flex: 1,
@@ -258,11 +305,10 @@ const styles = StyleSheet.create({
   },
   scrollContent: { padding: 18, paddingBottom: 40 },
   heroImage: {
-    width: "100%",
+    width: 340,
     height: 260,
     borderRadius: 22,
-    marginTop: 8,
-    marginBottom: 14,
+    marginRight: 10,
   },
   heroPlaceholder: {
     width: "100%",
