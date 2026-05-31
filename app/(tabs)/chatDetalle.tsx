@@ -23,6 +23,8 @@ type ChatItem = {
   time: string;
   unreadCount: number;
   isOnline: boolean;
+  blockedByMe?: boolean;
+  reportedByMe?: boolean;
 };
 
 function formatearFechaChat(fecha: any) {
@@ -87,28 +89,36 @@ export default function ChatDetalle() {
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
-        const lista: ChatItem[] = snapshot.docs.map((docSnap) => {
-          const data = docSnap.data() as any;
+        const lista: ChatItem[] = snapshot.docs
+          .filter((docSnap) => {
+            const data = docSnap.data() as any;
 
-          const otroUid =
-            Array.isArray(data.participantes)
-              ? data.participantes.find((uid: string) => uid !== user.uid)
-              : null;
+            return data.hiddenFor?.[user.uid] !== true;
+          })
+          .map((docSnap) => {
+            const data = docSnap.data() as any;
 
-          const otroUsuario =
-            (otroUid && data.participantesInfo?.[otroUid]) || {};
+            const otroUid =
+              Array.isArray(data.participantes)
+                ? data.participantes.find((uid: string) => uid !== user.uid)
+                : null;
 
-          return {
-            id: docSnap.id,
-            userName: otroUsuario.nombre || "Usuario",
-            userAvatar:
-              otroUsuario.foto || "https://i.pravatar.cc/150?img=32",
-            lastMessage: data.ultimoMensaje || "Sin mensajes",
-            time: formatearFechaChat(data.actualizadoEn),
-            unreadCount: data.unreadCount?.[user.uid] ?? 0,
-            isOnline: false,
-          };
-        });
+            const otroUsuario =
+              (otroUid && data.participantesInfo?.[otroUid]) || {};
+
+            return {
+              id: docSnap.id,
+              userName: otroUsuario.nombre || "Usuario",
+              userAvatar:
+                otroUsuario.foto || "https://i.pravatar.cc/150?img=32",
+              lastMessage: data.ultimoMensaje || "Sin mensajes",
+              time: formatearFechaChat(data.actualizadoEn),
+              unreadCount: data.unreadCount?.[user.uid] ?? 0,
+              isOnline: false,
+              blockedByMe: data.blockedBy?.[user.uid] === true,
+              reportedByMe: data.reportedBy?.[user.uid] === true,
+            };
+          });
 
         setChats(lista);
         setLoading(false);

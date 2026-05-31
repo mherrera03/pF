@@ -28,6 +28,7 @@ interface AdoptionPet {
   tipo: PetType;
   tamaño: PetSize;
   fotoUrl?: string | null;
+  fotosUrls?: string[];
   ownerName?: string;
 }
 
@@ -49,18 +50,25 @@ export default function AdoptionScreen() {
       const lista: AdoptionPet[] = snap.docs.map((doc) => {
         const data = doc.data();
 
-        return {
-          id: doc.id,
-          nombre: data.nombre || "",
-          raza: data.raza || "",
-          edad: data.edad || "",
-          sexo: data.sexo || "",
-          descripcion: data.descripcion || "",
-          tipo: data.tipo || data.especie || "Otro",
-          tamaño: data.tamaño || "Mediano",
-          fotoUrl: data.fotoUrl || null,
-          ownerName: data.ownerName || "Usuario",
-        };
+        const fotosUrls = Array.isArray(data.fotosUrls)
+          ? data.fotosUrls
+          : data.fotoUrl
+          ? [data.fotoUrl]
+          : [];
+
+      return {
+        id: doc.id,
+        nombre: data.nombre || "",
+        raza: data.raza || "",
+        edad: data.edad || "",
+        sexo: data.sexo || "",
+        descripcion: data.descripcion || "",
+        tipo: data.tipo || data.especie || "Otro",
+        tamaño: data.tamaño || "Mediano",
+        fotoUrl: data.fotoUrl || fotosUrls[0] || null,
+        fotosUrls,
+        ownerName: data.ownerName || "Usuario",
+      };
       });
 
       setTodasLasMascotas(lista);
@@ -253,13 +261,21 @@ function AdoptionPetCard({ pet }: { pet: AdoptionPet }) {
   return (
     <View style={styles.card}>
       <View style={styles.cardRow}>
-        {pet.fotoUrl ? (
-          <Image source={{ uri: pet.fotoUrl }} style={styles.petImageReal} />
-        ) : (
-          <View style={styles.petImage}>
-            <MaterialIcons name="pets" size={40} color="#9575CD" />
-          </View>
-        )}
+        <View style={styles.imageBox}>
+          {pet.fotoUrl ? (
+            <Image source={{ uri: pet.fotoUrl }} style={styles.petImageReal} />
+          ) : (
+            <View style={styles.petImage}>
+              <MaterialIcons name="pets" size={40} color="#9575CD" />
+            </View>
+          )}
+
+          {(pet.fotosUrls?.length || 0) > 1 && (
+            <View style={styles.morePhotosBadge}>
+              <Text style={styles.morePhotosText}>+{(pet.fotosUrls?.length || 0) - 1}</Text>
+            </View>
+          )}
+        </View>
 
         <View style={{ flex: 1 }}>
           <Text style={styles.ownerText}>Publicado por: {pet.ownerName || "Usuario"}</Text>
@@ -290,6 +306,31 @@ function AdoptionPetCard({ pet }: { pet: AdoptionPet }) {
 }
 
 const styles = StyleSheet.create({
+  imageBox: {
+  width: 100,
+  height: 100,
+  marginRight: 12,
+  position: "relative",
+},
+
+morePhotosBadge: {
+  position: "absolute",
+  right: 6,
+  bottom: 6,
+  backgroundColor: "rgba(0,0,0,0.65)",
+  borderRadius: 12,
+  minWidth: 34,
+  height: 24,
+  justifyContent: "center",
+  alignItems: "center",
+  paddingHorizontal: 8,
+},
+
+morePhotosText: {
+  color: "white",
+  fontWeight: "800",
+  fontSize: 12,
+},
   container: { flex: 1, backgroundColor: "#F5F5F5" },
   modalOverlay: { flex: 1, backgroundColor: "transparent" },
   header: { alignItems: "center", marginTop: 24, marginBottom: 16 },
@@ -343,20 +384,20 @@ const styles = StyleSheet.create({
   },
   cardRow: { flexDirection: "row" },
   petImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 12,
-    backgroundColor: "#F3E5F5",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  petImageReal: {
-    width: 100,
-    height: 100,
-    borderRadius: 12,
-    marginRight: 12,
-  },
+  width: 100,
+  height: 100,
+  borderRadius: 12,
+  backgroundColor: "#F3E5F5",
+  justifyContent: "center",
+  alignItems: "center",
+  marginRight: 12,
+},
+petImageReal: {
+  width: 100,
+  height: 100,
+  borderRadius: 12,
+  marginRight: 12,
+},
   petName: { fontWeight: "bold", fontSize: 20, color: "#9575CD" },
   petText: { fontSize: 13 },
   petSub: { fontSize: 13, color: "gray" },

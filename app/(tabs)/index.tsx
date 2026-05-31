@@ -18,6 +18,7 @@ import {
 
 import { auth, db } from "../../config/firebase";
 import { crearOObtenerChat } from "../../services/chatService";
+import { listenUserNotifications } from "../../services/notificationsService";
 
 type ReporteMascota = {
   fotosUrls?: string[];
@@ -44,6 +45,7 @@ function HomeScreen() {
   const [mascotas, setMascotas] = useState<ReporteMascota[]>([]);
   const [filtrosActivos, setFiltrosActivos] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   const handleReportarHallazgo = async (item: ReporteMascota) => {
     try {
@@ -62,7 +64,7 @@ function HomeScreen() {
       if (user.uid === item.ownerUid) {
         alert("No puedes crear un chat contigo misma");
         return;
-      }
+      }  
 
       const chatId = await crearOObtenerChat({
         reportId: item.id,
@@ -143,6 +145,22 @@ function HomeScreen() {
     };
   }, []);
 
+  useEffect(() => {
+  const user = auth.currentUser;
+
+  if (!user) {
+    setUnreadNotifications(0);
+    return;
+  }
+
+  const unsubscribe = listenUserNotifications(user.uid, (notifications) => {
+    const unread = notifications.filter((n) => !n.leida).length;
+    setUnreadNotifications(unread);
+  });
+
+  return unsubscribe;
+}, []);
+
   const aplicarFiltro = (tipo: string, valor: string) => {
     const filtro = `${tipo}:${valor}`;
 
@@ -205,8 +223,30 @@ function HomeScreen() {
       <StatusBar barStyle="dark-content" />
 
       <View style={styles.header}>
-        <Text style={styles.title}>Patitas Felices</Text>
-        <Text style={styles.subtitle}>Mascotas perdidas</Text>
+        <View style={styles.headerTop}>
+          <View style={{ width: 44 }} />
+
+          <View style={styles.headerTextBox}>
+            <Text style={styles.title}>Patitas Felices</Text>
+            <Text style={styles.subtitle}>Mascotas perdidas</Text>
+          </View>
+
+          <TouchableOpacity
+            onPress={() => router.push("/notificacionesRecientes" as any)}
+            style={styles.notificationButton}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons name="bell-outline" size={25} color="#5E35B1" />
+
+            {unreadNotifications > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>
+                  {unreadNotifications > 9 ? "9+" : unreadNotifications}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.actionRow}>
@@ -402,10 +442,51 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   header: {
-    alignItems: "center",
-    marginTop: 30,
-    marginBottom: 20,
-  },
+  marginTop: 30,
+  marginBottom: 20,
+},
+headerTop: {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+},
+headerTextBox: {
+  flex: 1,
+  alignItems: "center",
+},
+notificationButton: {
+  width: 44,
+  height: 44,
+  borderRadius: 22,
+  backgroundColor: "#FFFFFF",
+  justifyContent: "center",
+  alignItems: "center",
+  elevation: 3,
+  shadowColor: "#000",
+  shadowOpacity: 0.08,
+  shadowRadius: 8,
+  shadowOffset: { width: 0, height: 3 },
+  position: "relative",
+},
+notificationBadge: {
+  position: "absolute",
+  top: -2,
+  right: -2,
+  minWidth: 20,
+  height: 20,
+  borderRadius: 10,
+  backgroundColor: "#EF4444",
+  justifyContent: "center",
+  alignItems: "center",
+  paddingHorizontal: 5,
+  borderWidth: 2,
+  borderColor: "#FFFFFF",
+},
+notificationBadgeText: {
+  color: "#FFFFFF",
+  fontSize: 10,
+  fontWeight: "900",
+},
   title: {
     fontSize: 26,
     fontWeight: "bold",

@@ -25,7 +25,7 @@ import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../config/firebase";
 
 // ImageKit uploader
-import { uploadToImageKit } from "../services/imageUpload";
+import { uploadToImageKitFromBase64 } from "../services/imageUpload";
 
 // Validador de imágenes
 import {
@@ -40,11 +40,16 @@ const formatDateDDMMYYYY = (d: Date) => {
   return `${dd}/${mm}/${yyyy}`;
 };
 
+type SelectedImage = {
+  uri: string;
+  base64: string;
+};
+
 export default function ReporteScreen() {
   const router = useRouter();
 
   const [tipoReporte, setTipoReporte] = useState<"rapido" | "completo">("rapido");
-  const [images, setImages] = useState<string[]>([]);
+  const [images, setImages] = useState<SelectedImage[]>([]);
   const [coords, setCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [validatingImages, setValidatingImages] = useState(false);
@@ -111,12 +116,27 @@ export default function ReporteScreen() {
       allowsMultipleSelection: true,
       selectionLimit: 5 - images.length,
       quality: 0.8,
+      base64: true,
     });
 
     if (result.canceled) return;
 
-    const nuevasUris = result.assets.map((asset) => asset.uri);
-    const combinadas = [...images, ...nuevasUris].slice(0, 5);
+    const nuevasImagenes: SelectedImage[] = result.assets
+      .filter((asset) => asset.uri && asset.base64)
+      .map((asset) => ({
+        uri: asset.uri,
+        base64: asset.base64 as string,
+      }));
+
+    if (nuevasImagenes.length === 0) {
+      Alert.alert(
+        "Error",
+        "No se pudieron preparar las imágenes. Intenta seleccionarlas de nuevo."
+      );
+      return;
+    }
+
+    const combinadas = [...images, ...nuevasImagenes].slice(0, 5);
 
     setImages(combinadas);
     setImageValidationSummary(null);
@@ -164,7 +184,9 @@ export default function ReporteScreen() {
       setValidatingImages(true);
       setImageValidationSummary(null);
 
-      const results = await validateManyPetImages(images, expectedType);
+      const imageUris = images.map((img) => img.uri);
+
+      const results = await validateManyPetImages(imageUris, expectedType);
 
       const invalidOnes = results.filter((item) => item.decision === "reject");
       const warningOnes = results.filter((item) => item.decision === "warning");
@@ -246,9 +268,12 @@ export default function ReporteScreen() {
 
       const uploadedUrls: string[] = [];
 
-      for (const uri of images) {
-        const res = await uploadToImageKit(uri);
-        const url = typeof res === "string" ? res : res?.url ?? null;
+      for (const img of images) {
+        if (!img.base64) {
+          throw new Error("Una imagen no tiene base64.");
+        }
+
+        const url = await uploadToImageKitFromBase64(img.base64);
 
         if (url) {
           uploadedUrls.push(url);
@@ -300,8 +325,18 @@ export default function ReporteScreen() {
         emailReportante: user?.email ?? null,
       });
 
-      Alert.alert("Reporte enviado", "Tu reporte fue publicado correctamente 🐾");
-      router.back();
+      Alert.alert(
+        "Reporte enviado",
+        "Tu reporte fue publicado correctamente 🐾",
+        [
+          {
+            text: "Aceptar",
+            onPress: () => {
+              router.replace("/home");
+            },
+          },
+        ]
+      );
     } catch (e) {
       console.log("Error publicando:", e);
       Alert.alert("Error", "No se pudo publicar el reporte. Intenta de nuevo.");
@@ -588,9 +623,9 @@ export default function ReporteScreen() {
       </TouchableOpacity>
 
       <View style={styles.previewGrid}>
-        {images.map((uri, index) => (
-          <View key={`${uri}-${index}`} style={styles.previewItem}>
-            <Image source={{ uri }} style={styles.previewImage} />
+        {images.map((img, index) => (
+          <View key={`${img.uri}-${index}`} style={styles.previewItem}>
+            <Image source={{ uri: img.uri }} style={styles.previewImage} />
 
             <TouchableOpacity
               style={styles.removeBadge}

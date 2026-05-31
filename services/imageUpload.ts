@@ -34,3 +34,7 @@ export async function uploadToImageKitFromBase64(base64: string) {
   const data = await res.json();
   return data.url;
 }
+
+export async function uploadToImageKit(base64: string) {
+  return uploadToImageKitFromBase64(base64);
+}                                                                         

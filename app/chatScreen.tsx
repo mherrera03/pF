@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -104,6 +105,8 @@ export default function ChatScreen() {
           foto: otroUsuario.foto || "https://i.pravatar.cc/150?img=32",
           otroUid,
           lastReadAtOtro: otroUid ? data.lastReadAt?.[otroUid] : null,
+          bloqueadoPorMi: data.blockedBy?.[user.uid] === true,
+          bloqueadoPorOtro: otroUid ? data.blockedBy?.[otroUid] === true : false,
         });
 
         setLoadingChat(false);
@@ -179,6 +182,22 @@ export default function ChatScreen() {
 
     if (!contenido || !chatId || !user || sending || !chatInfo?.otroUid) return;
 
+    if (chatInfo?.bloqueadoPorMi) {
+      Alert.alert(
+        "Usuario bloqueado",
+        "No puedes enviar mensajes porque bloqueaste esta conversación."
+      );
+      return;
+    }
+
+    if (chatInfo?.bloqueadoPorOtro) {
+      Alert.alert(
+        "Chat no disponible",
+        "No puedes enviar mensajes en esta conversación por el momento."
+      );
+      return;
+    }
+
     try {
       setSending(true);
 
@@ -204,6 +223,163 @@ export default function ChatScreen() {
       setSending(false);
     }
   };
+
+const eliminarConversacionParaMi = async () => {
+  if (!chatId || !user) return;
+
+  Alert.alert(
+    "Eliminar conversación",
+    "La conversación se ocultará solo para ti. La otra persona aún podrá verla.",
+    [
+      {
+        text: "Cancelar",
+        style: "cancel",
+      },
+      {
+        text: "Eliminar",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await updateDoc(doc(db, "chats", String(chatId)), {
+              [`hiddenFor.${user.uid}`]: true,
+              [`unreadCount.${user.uid}`]: 0,
+              [`deletedAt.${user.uid}`]: serverTimestamp(),
+            });
+
+            Alert.alert("Listo", "La conversación fue eliminada de tu lista.");
+            router.back();
+          } catch (error) {
+            console.log("Error eliminando conversación:", error);
+            Alert.alert(
+              "Error",
+              "No se pudo eliminar la conversación. Intenta de nuevo."
+            );
+          }
+        },
+      },
+    ]
+  );
+};
+
+const crearReporteChat = async (motivo: string) => {
+  if (!chatId || !user || !chatInfo?.otroUid) return;
+
+  try {
+    const ultimoMensaje = mensajes[mensajes.length - 1];
+
+    await addDoc(collection(db, "reportesChat"), {
+      chatId: String(chatId),
+      reporterUid: user.uid,
+      reportedUid: chatInfo.otroUid,
+      motivo,
+      estado: "pendiente",
+      ultimoMensaje: ultimoMensaje?.texto || "",
+      ultimoMensajeSenderId: ultimoMensaje?.senderId || "",
+      createdAt: serverTimestamp(),
+    });
+
+    await updateDoc(doc(db, "chats", String(chatId)), {
+      [`reportedBy.${user.uid}`]: true,
+      actualizadoEn: serverTimestamp(),
+    });
+
+    Alert.alert(
+      "Reporte enviado",
+      "Gracias por avisarnos. Revisaremos esta conversación."
+    );
+  } catch (error) {
+    console.log("Error reportando chat:", error);
+    Alert.alert("Error", "No se pudo enviar el reporte. Intenta de nuevo.");
+  }
+};
+
+const reportarChat = () => {
+  Alert.alert(
+    "Reportar chat",
+    "Selecciona el motivo del reporte.",
+    [
+      {
+        text: "Spam",
+        onPress: () => crearReporteChat("Spam"),
+      },
+      {
+        text: "Comportamiento inapropiado",
+        onPress: () => crearReporteChat("Comportamiento inapropiado"),
+      },
+      {
+        text: "Información falsa o sospechosa",
+        onPress: () => crearReporteChat("Información falsa o sospechosa"),
+      },
+      {
+        text: "Otro motivo",
+        onPress: () => crearReporteChat("Otro motivo"),
+      },
+      {
+        text: "Cancelar",
+        style: "cancel",
+      },
+    ]
+  );
+};
+
+const bloquearUsuario = async () => {
+  if (!chatId || !user || !chatInfo?.otroUid) return;
+
+  Alert.alert(
+    "Bloquear usuario",
+    "Si bloqueas este usuario, ya no podrás enviar mensajes en esta conversación.",
+    [
+      {
+        text: "Cancelar",
+        style: "cancel",
+      },
+      {
+        text: "Bloquear",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await updateDoc(doc(db, "chats", String(chatId)), {
+              [`blockedBy.${user.uid}`]: true,
+              actualizadoEn: serverTimestamp(),
+            });
+
+            Alert.alert("Usuario bloqueado", "Ya no podrás enviar mensajes aquí.");
+          } catch (error) {
+            console.log("Error bloqueando usuario:", error);
+            Alert.alert("Error", "No se pudo bloquear el usuario.");
+          }
+        },
+      },
+    ]
+  );
+};
+
+const abrirOpcionesChat = () => {
+  Alert.alert(
+    "Opciones del chat",
+    "Elige una acción para esta conversación.",
+    [
+      {
+        text: "Eliminar conversación",
+        style: "destructive",
+        onPress: eliminarConversacionParaMi,
+      },
+      {
+        text: "Reportar chat o usuario",
+        onPress: reportarChat,
+      },
+      {
+        text: "Bloquear usuario",
+        style: "destructive",
+        onPress: bloquearUsuario,
+      },
+      {
+        text: "Cancelar",
+        style: "cancel",
+      },
+    ]
+  );
+};
 
   const mensajesInvertidos = useMemo(() => mensajes, [mensajes]);
 
@@ -270,6 +446,19 @@ export default function ChatScreen() {
               Conversación privada
             </Text>
           </View>
+
+          <TouchableOpacity
+            onPress={abrirOpcionesChat}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <MaterialCommunityIcons name="dots-vertical" size={26} color="#5E35B1" />
+          </TouchableOpacity>
         </View>
 
         <FlatList
@@ -512,12 +701,15 @@ export default function ChatScreen() {
 
           <TouchableOpacity
             onPress={enviarMensaje}
-            disabled={!texto.trim() || sending}
+            disabled={!texto.trim() || sending || chatInfo?.bloqueadoPorMi || chatInfo?.bloqueadoPorOtro}
             style={{
               width: 48,
               height: 48,
               borderRadius: 24,
-              backgroundColor: !texto.trim() || sending ? "#CFC4F5" : "#7B61FF",
+              backgroundColor:
+                !texto.trim() || sending || chatInfo?.bloqueadoPorMi || chatInfo?.bloqueadoPorOtro
+                  ? "#CFC4F5"
+                  : "#7B61FF",
               justifyContent: "center",
               alignItems: "center",
             }}
