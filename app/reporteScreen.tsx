@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
@@ -7,6 +8,7 @@ import {
   Alert,
   Animated,
   Image,
+  KeyboardAvoidingView,
   Linking,
   Platform,
   ScrollView,
@@ -387,328 +389,337 @@ export default function ReporteScreen() {
       : [];
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ paddingBottom: 150 }}
-      showsVerticalScrollIndicator={false}
-    >
-      <StatusBar barStyle="light-content" />
-      <Text style={styles.title}>Nuevo Reporte</Text>
-
-      <View style={styles.toggleContainer}>
-        {["rapido", "completo"].map((tipo) => (
-          <TouchableOpacity
-            key={tipo}
-            style={[
-              styles.toggleButton,
-              tipoReporte === tipo && styles.activeToggle,
-            ]}
-            onPress={() => setTipoReporte(tipo as "rapido" | "completo")}
-            disabled={submitting || validatingImages}
-          >
-            <Text
-              style={[
-                styles.toggleText,
-                tipoReporte === tipo && styles.activeText,
-              ]}
-            >
-              {tipo === "rapido" ? "Reporte Rápido" : "Reporte Completo"}
-            </Text>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: 150 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <StatusBar barStyle="light-content" />
+        <View style={styles.topBar}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <MaterialCommunityIcons name="arrow-left" size={24} color="#6A5ACD" />
           </TouchableOpacity>
-        ))}
-      </View>
+        </View>
+        <Text style={styles.title}>Nuevo Reporte</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Nombre de la mascota"
-        value={formData.nombre}
-        onChangeText={(text) => handleChange("nombre", text)}
-        editable={!submitting && !validatingImages}
-      />
-
-      <Text style={styles.label}>Especie</Text>
-      <View style={styles.wrapRow}>
-        {["Perro", "Gato"].map((esp) => (
-          <Animated.View key={esp} style={{ transform: [{ scale: scaleAnim }] }}>
+        <View style={styles.toggleContainer}>
+          {["rapido", "completo"].map((tipo) => (
             <TouchableOpacity
+              key={tipo}
               style={[
-                styles.chip,
-                formData.especie === esp && styles.chipActive,
+                styles.toggleButton,
+                tipoReporte === tipo && styles.activeToggle,
               ]}
-              onPress={() => {
-                handleChange("especie", esp);
-                handleChange("raza", "");
-                handleChange("razaOtro", "");
-                setImageValidationSummary(null);
-                animatePress();
-              }}
+              onPress={() => setTipoReporte(tipo as "rapido" | "completo")}
               disabled={submitting || validatingImages}
             >
               <Text
                 style={[
-                  styles.chipText,
-                  formData.especie === esp && styles.chipTextActive,
+                  styles.toggleText,
+                  tipoReporte === tipo && styles.activeText,
                 ]}
               >
-                {esp}
+                {tipo === "rapido" ? "Reporte Rápido" : "Reporte Completo"}
               </Text>
             </TouchableOpacity>
-          </Animated.View>
-        ))}
-      </View>
-
-      <Text style={styles.label}>Raza</Text>
-      <View style={styles.pickerContainer}>
-        <Picker
-          selectedValue={formData.raza}
-          onValueChange={(v) => {
-            handleChange("raza", v);
-            if (v !== "Otro") {
-              handleChange("razaOtro", "");
-            }
-          }}
-          enabled={!submitting && !validatingImages && !!formData.especie}
-        >
-          <Picker.Item
-            label={
-              formData.especie
-                ? "Seleccionar raza..."
-                : "Primero selecciona la especie"
-            }
-            value=""
-          />
-
-          {razasSegunEspecie.map((raza) => (
-            <Picker.Item key={raza} label={raza} value={raza} />
           ))}
-        </Picker>
-      </View>
+        </View>
 
-      {formData.raza === "Otro" && (
         <TextInput
           style={styles.input}
-          placeholder="Escribe la raza de la mascota"
-          value={formData.razaOtro}
-          onChangeText={(text) => handleChange("razaOtro", text)}
+          placeholder="Nombre de la mascota"
+          value={formData.nombre}
+          onChangeText={(text) => handleChange("nombre", text)}
           editable={!submitting && !validatingImages}
         />
-      )}
 
-      <Text style={styles.label}>Fecha</Text>
-      <TouchableOpacity
-        style={styles.dateButton}
-        onPress={() => setShowDatePicker(true)}
-        disabled={submitting || validatingImages}
-      >
-        <Text style={styles.dateText}>
-          Seleccionar fecha: {formatDateDDMMYYYY(fechaDate)}
-        </Text>
-      </TouchableOpacity>
-
-      {showDatePicker && (
-        <DateTimePicker
-          value={fechaDate}
-          mode="date"
-          display={Platform.OS === "ios" ? "spinner" : "default"}
-          onChange={onChangeFecha}
-          maximumDate={new Date()}
-        />
-      )}
-
-      <Text style={styles.label}>Color</Text>
-      <View style={styles.pickerContainer}>
-        <Picker
-          selectedValue={formData.color}
-          onValueChange={(v) => handleChange("color", v)}
-          enabled={!submitting && !validatingImages}
-        >
-          <Picker.Item label="Seleccionar color..." value="" />
-          <Picker.Item label="Blanco" value="Blanco" />
-          <Picker.Item label="Negro" value="Negro" />
-          <Picker.Item label="Café" value="Café" />
-          <Picker.Item label="Gris" value="Gris" />
-          <Picker.Item label="Amarillo" value="Amarillo" />
-          <Picker.Item label="Dorado" value="Dorado" />
-          <Picker.Item label="Mixto" value="Mixto" />
-        </Picker>
-      </View>
-
-      <Text style={styles.label}>Ubicación</Text>
-      <TouchableOpacity
-        style={styles.locationButton}
-        onPress={getLocation}
-        disabled={submitting || validatingImages}
-      >
-        <Text style={styles.locationText}>Obtener ubicación actual</Text>
-      </TouchableOpacity>
-
-      {coords && (
-        <TouchableOpacity
-          onPress={() =>
-            Linking.openURL(
-              `https://www.google.com/maps/search/?api=1&query=${coords.latitude},${coords.longitude}`
-            )
-          }
-        >
-          <Text style={styles.mapPreview}>Ver en Google Maps</Text>
-        </TouchableOpacity>
-      )}
-
-      <TextInput
-        style={styles.input}
-        placeholder="Teléfono"
-        keyboardType="numeric"
-        value={formData.telefono}
-        onChangeText={(text) => handleChange("telefono", text)}
-        editable={!submitting && !validatingImages}
-      />
-
-      <Text style={styles.label}>¿Ofreces recompensa?</Text>
-      <View style={styles.wrapRow}>
-        {[
-          { label: "Sí", value: "si" },
-          { label: "No", value: "no" },
-        ].map((item) => (
-          <Animated.View
-            key={item.value}
-            style={{ transform: [{ scale: scaleAnim }] }}
-          >
-            <TouchableOpacity
-              style={[
-                styles.chip,
-                formData.ofreceRecompensa === item.value && styles.chipActive,
-              ]}
-              onPress={() => {
-                handleChange("ofreceRecompensa", item.value);
-                if (item.value === "no") handleChange("montoRecompensa", "");
-                animatePress();
-              }}
-              disabled={submitting || validatingImages}
-            >
-              <Text
+        <Text style={styles.label}>Especie</Text>
+        <View style={styles.wrapRow}>
+          {["Perro", "Gato"].map((esp) => (
+            <Animated.View key={esp} style={{ transform: [{ scale: scaleAnim }] }}>
+              <TouchableOpacity
                 style={[
-                  styles.chipText,
-                  formData.ofreceRecompensa === item.value &&
-                    styles.chipTextActive,
+                  styles.chip,
+                  formData.especie === esp && styles.chipActive,
                 ]}
+                onPress={() => {
+                  handleChange("especie", esp);
+                  handleChange("raza", "");
+                  handleChange("razaOtro", "");
+                  setImageValidationSummary(null);
+                  animatePress();
+                }}
+                disabled={submitting || validatingImages}
               >
-                {item.label}
-              </Text>
-            </TouchableOpacity>
-          </Animated.View>
-        ))}
-      </View>
-
-      {formData.ofreceRecompensa === "si" && (
-        <TextInput
-          style={styles.input}
-          placeholder="Monto de la recompensa"
-          keyboardType="numeric"
-          value={formData.montoRecompensa}
-          onChangeText={(text) => handleChange("montoRecompensa", text)}
-          editable={!submitting && !validatingImages}
-        />
-      )}
-
-      <TouchableOpacity
-        style={styles.photoButton}
-        onPress={pickImages}
-        disabled={submitting || validatingImages}
-      >
-        <Text style={styles.photoText}>
-          {images.length > 0
-            ? `Agregar o cambiar fotos (${images.length}/5)`
-            : "Agregar fotos"}
-        </Text>
-      </TouchableOpacity>
-
-      <View style={styles.previewGrid}>
-        {images.map((img, index) => (
-          <View key={`${img.uri}-${index}`} style={styles.previewItem}>
-            <Image source={{ uri: img.uri }} style={styles.previewImage} />
-
-            <TouchableOpacity
-              style={styles.removeBadge}
-              onPress={() => removeImage(index)}
-              disabled={submitting || validatingImages}
-            >
-              <Text style={styles.removeBadgeText}>×</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
-      </View>
-
-      {validatingImages && (
-        <Text style={styles.validationInfo}>Validando imágenes...</Text>
-      )}
-
-      {imageValidationSummary && !validatingImages && (
-        <Text style={styles.validationInfo}>{imageValidationSummary}</Text>
-      )}
-
-      {tipoReporte === "completo" && (
-        <>
-          <Text style={styles.label}>Tamaño</Text>
-          <View style={styles.wrapRow}>
-            {["Pequeño", "Mediano", "Grande"].map((size) => (
-              <Animated.View
-                key={size}
-                style={{ transform: [{ scale: scaleAnim }] }}
-              >
-                <TouchableOpacity
+                <Text
                   style={[
-                    styles.chip,
-                    formData.tamaño === size && styles.chipActive,
+                    styles.chipText,
+                    formData.especie === esp && styles.chipTextActive,
                   ]}
-                  onPress={() => {
-                    handleChange("tamaño", size);
-                    animatePress();
-                  }}
-                  disabled={submitting || validatingImages}
                 >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      formData.tamaño === size && styles.chipTextActive,
-                    ]}
-                  >
-                    {size}
-                  </Text>
-                </TouchableOpacity>
-              </Animated.View>
-            ))}
-          </View>
+                  {esp}
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
+          ))}
+        </View>
 
+        <Text style={styles.label}>Raza</Text>
+        <View style={styles.pickerContainer}>
+          <Picker
+            selectedValue={formData.raza}
+            onValueChange={(v) => {
+              handleChange("raza", v);
+              if (v !== "Otro") {
+                handleChange("razaOtro", "");
+              }
+            }}
+            enabled={!submitting && !validatingImages && !!formData.especie}
+          >
+            <Picker.Item
+              label={
+                formData.especie
+                  ? "Seleccionar raza..."
+                  : "Primero selecciona la especie"
+              }
+              value=""
+            />
+
+            {razasSegunEspecie.map((raza) => (
+              <Picker.Item key={raza} label={raza} value={raza} />
+            ))}
+          </Picker>
+        </View>
+
+        {formData.raza === "Otro" && (
           <TextInput
-            style={[styles.input, { height: 90 }]}
-            placeholder="Características distintivas"
-            multiline
-            value={formData.rasgos}
-            onChangeText={(text) => handleChange("rasgos", text)}
+            style={styles.input}
+            placeholder="Escribe la raza de la mascota"
+            value={formData.razaOtro}
+            onChangeText={(text) => handleChange("razaOtro", text)}
             editable={!submitting && !validatingImages}
           />
-        </>
-      )}
+        )}
 
-      <TouchableOpacity
-        style={[
-          styles.submitButton,
-          (submitting || validatingImages) && { opacity: 0.7 },
-        ]}
-        onPress={handleSubmit}
-        disabled={submitting || validatingImages}
-      >
-        <Text style={styles.submitText}>
-          {validatingImages
-            ? "Validando imágenes..."
-            : submitting
-            ? "Publicando..."
-            : tipoReporte === "rapido"
-            ? "Publicar Reporte Rápido"
-            : "Publicar Reporte Completo"}
-        </Text>
-      </TouchableOpacity>
-    </ScrollView>
+        <Text style={styles.label}>Fecha</Text>
+        <TouchableOpacity
+          style={styles.dateButton}
+          onPress={() => setShowDatePicker(true)}
+          disabled={submitting || validatingImages}
+        >
+          <Text style={styles.dateText}>
+            Seleccionar fecha: {formatDateDDMMYYYY(fechaDate)}
+          </Text>
+        </TouchableOpacity>
+
+        {showDatePicker && (
+          <DateTimePicker
+            value={fechaDate}
+            mode="date"
+            display={Platform.OS === "ios" ? "spinner" : "default"}
+            onChange={onChangeFecha}
+            maximumDate={new Date()}
+          />
+        )}
+
+        <Text style={styles.label}>Color</Text>
+        <View style={styles.pickerContainer}>
+          <Picker
+            selectedValue={formData.color}
+            onValueChange={(v) => handleChange("color", v)}
+            enabled={!submitting && !validatingImages}
+          >
+            <Picker.Item label="Seleccionar color..." value="" />
+            <Picker.Item label="Blanco" value="Blanco" />
+            <Picker.Item label="Negro" value="Negro" />
+            <Picker.Item label="Café" value="Café" />
+            <Picker.Item label="Gris" value="Gris" />
+            <Picker.Item label="Amarillo" value="Amarillo" />
+            <Picker.Item label="Dorado" value="Dorado" />
+            <Picker.Item label="Mixto" value="Mixto" />
+          </Picker>
+        </View>
+
+        <Text style={styles.label}>Ubicación</Text>
+        <TouchableOpacity
+          style={styles.locationButton}
+          onPress={getLocation}
+          disabled={submitting || validatingImages}
+        >
+          <Text style={styles.locationText}>Obtener ubicación actual</Text>
+        </TouchableOpacity>
+
+        {coords && (
+          <TouchableOpacity
+            onPress={() =>
+              Linking.openURL(
+                `https://www.google.com/maps/search/?api=1&query=${coords.latitude},${coords.longitude}`
+              )
+            }
+          >
+            <Text style={styles.mapPreview}>Ver en Google Maps</Text>
+          </TouchableOpacity>
+        )}
+
+        <TextInput
+          style={styles.input}
+          placeholder="Teléfono"
+          keyboardType="numeric"
+          value={formData.telefono}
+          onChangeText={(text) => handleChange("telefono", text)}
+          editable={!submitting && !validatingImages}
+        />
+
+        <Text style={styles.label}>¿Ofreces recompensa?</Text>
+        <View style={styles.wrapRow}>
+          {[
+            { label: "Sí", value: "si" },
+            { label: "No", value: "no" },
+          ].map((item) => (
+            <Animated.View
+              key={item.value}
+              style={{ transform: [{ scale: scaleAnim }] }}
+            >
+              <TouchableOpacity
+                style={[
+                  styles.chip,
+                  formData.ofreceRecompensa === item.value && styles.chipActive,
+                ]}
+                onPress={() => {
+                  handleChange("ofreceRecompensa", item.value);
+                  if (item.value === "no") handleChange("montoRecompensa", "");
+                  animatePress();
+                }}
+                disabled={submitting || validatingImages}
+              >
+                <Text
+                  style={[
+                    styles.chipText,
+                    formData.ofreceRecompensa === item.value &&
+                      styles.chipTextActive,
+                  ]}
+                >
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
+          ))}
+        </View>
+
+        {formData.ofreceRecompensa === "si" && (
+          <TextInput
+            style={styles.input}
+            placeholder="Monto de la recompensa"
+            keyboardType="numeric"
+            value={formData.montoRecompensa}
+            onChangeText={(text) => handleChange("montoRecompensa", text)}
+            editable={!submitting && !validatingImages}
+          />
+        )}
+
+        <TouchableOpacity
+          style={styles.photoButton}
+          onPress={pickImages}
+          disabled={submitting || validatingImages}
+        >
+          <Text style={styles.photoText}>
+            {images.length > 0
+              ? `Agregar o cambiar fotos (${images.length}/5)`
+              : "Agregar fotos"}
+          </Text>
+        </TouchableOpacity>
+
+        <View style={styles.previewGrid}>
+          {images.map((img, index) => (
+            <View key={`${img.uri}-${index}`} style={styles.previewItem}>
+              <Image source={{ uri: img.uri }} style={styles.previewImage} />
+
+              <TouchableOpacity
+                style={styles.removeBadge}
+                onPress={() => removeImage(index)}
+                disabled={submitting || validatingImages}
+              >
+                <Text style={styles.removeBadgeText}>×</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+
+        {validatingImages && (
+          <Text style={styles.validationInfo}>Validando imágenes...</Text>
+        )}
+
+        {imageValidationSummary && !validatingImages && (
+          <Text style={styles.validationInfo}>{imageValidationSummary}</Text>
+        )}
+
+        {tipoReporte === "completo" && (
+          <>
+            <Text style={styles.label}>Tamaño</Text>
+            <View style={styles.wrapRow}>
+              {["Pequeño", "Mediano", "Grande"].map((size) => (
+                <Animated.View
+                  key={size}
+                  style={{ transform: [{ scale: scaleAnim }] }}
+                >
+                  <TouchableOpacity
+                    style={[
+                      styles.chip,
+                      formData.tamaño === size && styles.chipActive,
+                    ]}
+                    onPress={() => {
+                      handleChange("tamaño", size);
+                      animatePress();
+                    }}
+                    disabled={submitting || validatingImages}
+                  >
+                    <Text
+                      style={[
+                        styles.chipText,
+                        formData.tamaño === size && styles.chipTextActive,
+                      ]}
+                    >
+                      {size}
+                    </Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              ))}
+            </View>
+
+            <TextInput
+              style={[styles.input, { height: 90 }]}
+              placeholder="Características distintivas"
+              multiline
+              value={formData.rasgos}
+              onChangeText={(text) => handleChange("rasgos", text)}
+              editable={!submitting && !validatingImages}
+            />
+          </>
+        )}
+
+        <TouchableOpacity
+          style={[
+            styles.submitButton,
+            (submitting || validatingImages) && { opacity: 0.7 },
+          ]}
+          onPress={handleSubmit}
+          disabled={submitting || validatingImages}
+        >
+          <Text style={styles.submitText}>
+            {validatingImages
+              ? "Validando imágenes..."
+              : submitting
+              ? "Publicando..."
+              : tipoReporte === "rapido"
+              ? "Publicar Reporte Rápido"
+              : "Publicar Reporte Completo"}
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -727,7 +738,16 @@ const styles = StyleSheet.create({
     marginBottom: 25,
     marginTop: 15,
   },
-
+  topBar: { paddingHorizontal: 10, paddingTop: 8 
+  },
+  backButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: "#EDE7FF",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   toggleContainer: {
     flexDirection: "row",
     marginBottom: 20,

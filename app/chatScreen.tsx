@@ -16,12 +16,12 @@ import {
   Alert,
   FlatList,
   Image,
-  KeyboardAvoidingView,
-  Platform,
+  Keyboard,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  type KeyboardEvent
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -75,6 +75,22 @@ export default function ChatScreen() {
   const [sending, setSending] = useState(false);
 
   const user = auth.currentUser;
+
+const [kbHeight, setKbHeight] = useState(0);
+
+useEffect(() => {
+  const showSub = Keyboard.addListener("keyboardDidShow", (e: KeyboardEvent) => {
+    setKbHeight(e.endCoordinates.height);
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+  });
+  const hideSub = Keyboard.addListener("keyboardDidHide", () => {
+    setKbHeight(0);
+  });
+  return () => {
+    showSub.remove();
+    hideSub.remove();
+  };
+}, []);
 
   useEffect(() => {
     if (!chatId || !user) return;
@@ -395,6 +411,8 @@ const abrirOpcionesChat = () => {
     );
   }
 
+  
+
   if (!chatInfo) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: "#F6F2FF" }}>
@@ -412,11 +430,7 @@ const abrirOpcionesChat = () => {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#F6F2FF" }} edges={["top", "left", "right"]}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
-      >
+      <View style={{ flex: 1 }}>
         <View
           style={{
             flexDirection: "row",
@@ -717,7 +731,8 @@ const abrirOpcionesChat = () => {
             <MaterialCommunityIcons name="send" size={22} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
+        <View style={{ height: kbHeight }} />
+      </View>
     </SafeAreaView>
   );
 }
