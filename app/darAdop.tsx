@@ -7,7 +7,9 @@ import { useState } from "react";
 import {
   Alert,
   Image,
+  KeyboardAvoidingView,
   Linking,
+  Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -319,6 +321,9 @@ const eliminarImagen = (index: number) => {
   );
 
   return (
+  <KeyboardAvoidingView
+    style={{ flex: 1 }}
+    behavior={Platform.OS === "ios" ? "padding" : "height"}>
     <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <StatusBar barStyle="dark-content" backgroundColor="#F6F2FF" />
 
@@ -637,6 +642,7 @@ const eliminarImagen = (index: number) => {
         )}
       </ScrollView>
     </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 }
 

@@ -273,7 +273,10 @@ const eliminarConversacionParaMi = async () => {
           }
         },
       },
-    ]
+    ],
+    {
+      cancelable: true
+    }
   );
 };
 
@@ -334,7 +337,10 @@ const reportarChat = () => {
         text: "Cancelar",
         style: "cancel",
       },
-    ]
+    ],
+    {
+      cancelable: true
+    }
   );
 };
 
@@ -366,7 +372,10 @@ const bloquearUsuario = async () => {
           }
         },
       },
-    ]
+    ],
+    {
+      cancelable: true
+    }
   );
 };
 
@@ -393,7 +402,10 @@ const abrirOpcionesChat = () => {
         text: "Cancelar",
         style: "cancel",
       },
-    ]
+    ],
+    {
+      cancelable: true
+    }
   );
 };
 
